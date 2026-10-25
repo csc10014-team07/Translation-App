@@ -218,3 +218,33 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Models
+models/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.onnx
+
+# Mobile (Expo / React Native)
+node_modules/
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.env*.local
+
+# Dữ liệu sinh ra khi chạy
+*.wav
+*.mp3
+*.m4a
+uploads/
+tmp/
+
+# OS / editor
+.DS_Store
+Thumbs.db
