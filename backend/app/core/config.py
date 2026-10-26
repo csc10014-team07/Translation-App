@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # ── Model identifiers / paths ──────────────────────────────────────────
     MODELS_DIR: str = "./models"
     PHOASR_MODEL_ID: str = "Qualcomm-AI-Research/PhoASR-whisper-small"
-    GEMMA_GGUF_PATH: str = "./models/gemma/gemma-3-4b-it.Q5_K_M.gguf"
+    GEMMA_GGUF_PATH: str = "./models/gemma/translategemma-4b-it.Q5_K_M.gguf"
     QWEN_TTS_MODEL_ID: str = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 
     # ── Compute device ─────────────────────────────────────────────────────

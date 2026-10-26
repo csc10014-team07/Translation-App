@@ -4,7 +4,7 @@ Model download helper script.
 
 Downloads the required model weights into local storage:
 1. PhoASR-whisper-small -> models/phoasr
-2. Gemma 3 4B GGUF (Q5_K_M) -> models/gemma/gemma-3-4b-it.Q5_K_M.gguf
+2. TranslateGemma 4B GGUF (Q5_K_M) -> models/gemma/translategemma-4b-it.Q5_K_M.gguf
 3. Qwen3-TTS-12Hz-0.6B-Base -> models/qwen_tts
 """
 import argparse
@@ -38,13 +38,13 @@ def download_phoasr(target_dir: Path) -> None:
 
 
 def download_gemma_gguf(target_file: Path) -> None:
-    """Download Gemma 3 4B GGUF (Q5_K_M quantization)."""
-    repo_id = "bartowski/google_gemma-3-4b-it-GGUF"
-    filename = "google_gemma-3-4b-it-Q5_K_M.gguf"
+    """Download TranslateGemma 4B GGUF (Q5_K_M quantization)."""
+    repo_id = "mradermacher/translategemma-4b-it-GGUF"
+    filename = "translategemma-4b-it.Q5_K_M.gguf"
     target_dir = target_file.parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n[2/3] Downloading Gemma 3 4B GGUF ({filename}) from {repo_id}...")
+    print(f"\n[2/3] Downloading TranslateGemma 4B GGUF ({filename}) from {repo_id}...")
     if target_file.exists() and target_file.stat().st_size > 1024 * 1024 * 100:
         print(f"File already exists: {target_file} ({target_file.stat().st_size / (1024*1024):.1f} MB)")
         return
@@ -60,10 +60,10 @@ def download_gemma_gguf(target_file: Path) -> None:
         downloaded_p = Path(downloaded_path)
         if downloaded_p.resolve() != target_file.resolve():
             shutil.move(str(downloaded_p), str(target_file))
-        print(f"Gemma GGUF ready at: {target_file}")
+        print(f"TranslateGemma GGUF ready at: {target_file}")
     except Exception as exc:
         print(
-            f"Failed to auto-download Gemma GGUF: {exc}\n"
+            f"Failed to auto-download TranslateGemma GGUF: {exc}\n"
             "If gated or restricted, you can manually download the Q5_K_M GGUF from:\n"
             f"  https://huggingface.co/{repo_id}\n"
             f"and place it at: {target_file}"
@@ -114,7 +114,7 @@ def main() -> None:
     print(f"Models storage directory: {base_dir}")
 
     phoasr_dir = base_dir / "phoasr"
-    gemma_file = base_dir / "gemma" / "gemma-3-4b-it.Q5_K_M.gguf"
+    gemma_file = base_dir / "gemma" / "translategemma-4b-it.Q5_K_M.gguf"
     tts_dir = base_dir / "qwen_tts"
 
     if not args.skip_phoasr:
