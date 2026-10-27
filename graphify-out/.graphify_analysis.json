@@ -1,0 +1,480 @@
+{
+  "communities": {
+    "0": [
+      "aiofiles",
+      "asyncio",
+      "backend_app_api_deps",
+      "backend_app_api_deps_dep_model_manager",
+      "backend_app_api_deps_py_modelmanager",
+      "backend_app_api_deps_rationale_1",
+      "backend_app_api_deps_rationale_8",
+      "backend_app_api_routes_asr",
+      "backend_app_api_routes_asr_py_modelmanager",
+      "backend_app_api_routes_asr_py_post",
+      "backend_app_api_routes_asr_py_uploadfile",
+      "backend_app_api_routes_asr_rationale_1",
+      "backend_app_api_routes_asr_rationale_39",
+      "backend_app_api_routes_asr_transcribe_audio",
+      "backend_app_api_routes_init",
+      "backend_app_api_routes_metrics",
+      "backend_app_api_routes_metrics_rationale_1",
+      "backend_app_api_routes_ocr",
+      "backend_app_api_routes_ocr_rationale_1",
+      "backend_app_api_routes_translate",
+      "backend_app_api_routes_translate_rationale_1",
+      "backend_app_api_routes_tts",
+      "backend_app_api_routes_tts_audio_to_wav_base64",
+      "backend_app_api_routes_tts_is_vietnamese",
+      "backend_app_api_routes_tts_py_modelmanager",
+      "backend_app_api_routes_tts_py_post",
+      "backend_app_api_routes_tts_py_uploadfile",
+      "backend_app_api_routes_tts_rationale_1",
+      "backend_app_api_routes_tts_rationale_35",
+      "backend_app_api_routes_tts_rationale_59",
+      "backend_app_api_routes_tts_synthesise_speech",
+      "backend_app_core_vram_monitor",
+      "backend_app_core_vram_monitor_get_vram_info",
+      "backend_app_core_vram_monitor_rationale_1",
+      "backend_app_core_vram_monitor_rationale_13",
+      "backend_app_main",
+      "backend_app_main_create_app",
+      "backend_app_main_create_app_health",
+      "backend_app_main_lifespan",
+      "backend_app_main_rationale_1",
+      "backend_app_main_rationale_41",
+      "backend_app_main_rationale_60",
+      "backend_app_models_manager",
+      "base64",
+      "collections",
+      "contextlib",
+      "fastapi",
+      "fastapi_middleware_cors",
+      "fastapi_responses",
+      "io",
+      "logging",
+      "ndarray",
+      "numpy",
+      "pathlib",
+      "soundfile",
+      "tempfile",
+      "time",
+      "typing"
+    ],
+    "1": [
+      "mobile_app_app",
+      "mobile_app_tsx_mobile_app",
+      "mobile_package",
+      "mobile_package_dependencies",
+      "mobile_package_dependencies_axios",
+      "mobile_package_dependencies_expo",
+      "mobile_package_dependencies_expo_av",
+      "mobile_package_dependencies_expo_file_system",
+      "mobile_package_dependencies_expo_image_picker",
+      "mobile_package_dependencies_expo_status_bar",
+      "mobile_package_dependencies_expo_vector_icons",
+      "mobile_package_dependencies_react",
+      "mobile_package_dependencies_react_native",
+      "mobile_package_dependencies_react_native_safe_area_context",
+      "mobile_package_dependencies_react_native_screens",
+      "mobile_package_dependencies_react_navigation_bottom_tabs",
+      "mobile_package_dependencies_react_navigation_native",
+      "mobile_package_dependencies_react_navigation_stack",
+      "mobile_package_dependencies_zustand",
+      "mobile_package_devdependencies",
+      "mobile_package_devdependencies_babel_core",
+      "mobile_package_devdependencies_types_react",
+      "mobile_package_devdependencies_typescript",
+      "mobile_package_main",
+      "mobile_package_name",
+      "mobile_package_scripts",
+      "mobile_package_scripts_android",
+      "mobile_package_scripts_ios",
+      "mobile_package_scripts_start",
+      "mobile_package_scripts_web",
+      "mobile_package_version",
+      "mobile_src_navigation_appnavigator",
+      "mobile_src_navigation_appnavigator_appnavigator",
+      "mobile_src_navigation_appnavigator_rootstackparamlist",
+      "mobile_src_navigation_appnavigator_stack",
+      "ref_axios",
+      "ref_babel_core",
+      "ref_expo",
+      "ref_expo_file_system",
+      "ref_expo_image_picker",
+      "ref_expo_status_bar",
+      "ref_react_native_safe_area_context",
+      "ref_react_native_screens",
+      "ref_react_navigation_bottom_tabs",
+      "ref_react_navigation_native",
+      "ref_react_navigation_stack",
+      "ref_types_react",
+      "ref_typescript",
+      "ref_zustand"
+    ],
+    "2": [
+      "mobile_src_components_contextinput",
+      "mobile_src_components_contextinput_contextinput",
+      "mobile_src_components_contextinput_props",
+      "mobile_src_components_contextinput_styles",
+      "mobile_src_components_imagepickerbutton",
+      "mobile_src_components_imagepickerbutton_imagepickerbutton",
+      "mobile_src_components_imagepickerbutton_props",
+      "mobile_src_components_imagepickerbutton_styles",
+      "mobile_src_components_inputmodeselector",
+      "mobile_src_components_inputmodeselector_inputmode",
+      "mobile_src_components_inputmodeselector_inputmodeselector",
+      "mobile_src_components_inputmodeselector_props",
+      "mobile_src_components_inputmodeselector_styles",
+      "mobile_src_components_inputmodeselector_tab",
+      "mobile_src_components_inputmodeselector_tabs",
+      "mobile_src_components_languagepicker",
+      "mobile_src_components_languagepicker_languagepicker",
+      "mobile_src_components_languagepicker_props",
+      "mobile_src_components_languagepicker_styles",
+      "mobile_src_components_translationresult",
+      "mobile_src_components_translationresult_props",
+      "mobile_src_components_translationresult_styles",
+      "mobile_src_components_translationresult_translationresult",
+      "mobile_src_components_voicecloningpanel",
+      "mobile_src_components_voicecloningpanel_props",
+      "mobile_src_components_voicecloningpanel_styles",
+      "mobile_src_components_voicecloningpanel_voicecloningpanel",
+      "mobile_src_components_voicerecorder",
+      "mobile_src_components_voicerecorder_props",
+      "mobile_src_components_voicerecorder_styles",
+      "mobile_src_components_voicerecorder_voicerecorder",
+      "mobile_src_constants_languages",
+      "mobile_src_constants_languages_languagecode",
+      "mobile_src_constants_languages_target_languages",
+      "mobile_src_constants_languages_tts_supported_languages",
+      "mobile_src_screens_translationscreen",
+      "mobile_src_screens_translationscreen_styles",
+      "mobile_src_screens_translationscreen_translationscreen",
+      "ref_expo_av",
+      "ref_expo_vector_icons",
+      "ref_react",
+      "ref_react_native"
+    ],
+    "3": [
+      "backend_app_api_routes_translate_py_modelmanager",
+      "backend_app_api_routes_translate_py_post",
+      "backend_app_api_routes_translate_rationale_32",
+      "backend_app_api_routes_translate_translate_text",
+      "backend_app_schemas_asr",
+      "backend_app_schemas_asr_asrresponse",
+      "backend_app_schemas_asr_py_basemodel",
+      "backend_app_schemas_asr_rationale_1",
+      "backend_app_schemas_asr_rationale_8",
+      "backend_app_schemas_translate",
+      "backend_app_schemas_translate_py_basemodel",
+      "backend_app_schemas_translate_rationale_1",
+      "backend_app_schemas_translate_rationale_26",
+      "backend_app_schemas_translate_rationale_8",
+      "backend_app_schemas_translate_translaterequest",
+      "backend_app_schemas_translate_translateresponse",
+      "backend_app_schemas_tts",
+      "backend_app_schemas_tts_py_basemodel",
+      "backend_app_schemas_tts_rationale_1",
+      "backend_app_schemas_tts_rationale_25",
+      "backend_app_schemas_tts_rationale_8",
+      "backend_app_schemas_tts_ttsrequest",
+      "backend_app_schemas_tts_ttsresponse",
+      "pydantic"
+    ],
+    "4": [
+      "mobile_src_config_api",
+      "mobile_src_config_api_api_base_url",
+      "mobile_src_services_api",
+      "mobile_src_services_api_apiclient",
+      "mobile_src_services_api_appendfiletoform",
+      "mobile_src_services_api_asrresponse",
+      "mobile_src_services_api_checkhealth",
+      "mobile_src_services_api_healthresponse",
+      "mobile_src_services_api_ocrimage",
+      "mobile_src_services_api_ocrresponse",
+      "mobile_src_services_api_savebase64audio",
+      "mobile_src_services_api_synthesizespeech",
+      "mobile_src_services_api_transcribeaudio",
+      "mobile_src_services_api_translateresponse",
+      "mobile_src_services_api_translatetext",
+      "mobile_src_services_api_ttsresponse",
+      "mobile_src_store_translationstore",
+      "mobile_src_store_translationstore_extracterrormessage",
+      "mobile_src_store_translationstore_initialstate",
+      "mobile_src_store_translationstore_inputmode",
+      "mobile_src_store_translationstore_translationstate",
+      "mobile_src_store_translationstore_usetranslationstore"
+    ],
+    "5": [
+      "mobile_app_adaptiveicon_backgroundcolor",
+      "mobile_app_android_adaptiveicon",
+      "mobile_app_expo",
+      "mobile_app_expo_android",
+      "mobile_app_expo_icon",
+      "mobile_app_expo_ios",
+      "mobile_app_expo_name",
+      "mobile_app_expo_orientation",
+      "mobile_app_expo_plugins",
+      "mobile_app_expo_slug",
+      "mobile_app_expo_splash",
+      "mobile_app_expo_userinterfacestyle",
+      "mobile_app_expo_version",
+      "mobile_app_ios_supportstablet",
+      "mobile_app_json_mobile_app",
+      "mobile_app_splash_backgroundcolor",
+      "mobile_app_splash_resizemode"
+    ],
+    "6": [
+      "argparse",
+      "backend_scripts_download_models",
+      "backend_scripts_download_models_download_gemma_gguf",
+      "backend_scripts_download_models_download_phoasr",
+      "backend_scripts_download_models_download_qwen_tts",
+      "backend_scripts_download_models_main",
+      "backend_scripts_download_models_rationale_2",
+      "backend_scripts_download_models_rationale_27",
+      "backend_scripts_download_models_rationale_41",
+      "backend_scripts_download_models_rationale_74",
+      "huggingface_hub",
+      "os",
+      "path",
+      "shutil",
+      "sys"
+    ],
+    "7": [
+      "any",
+      "backend_app_core_vram_monitor_rationale_46",
+      "backend_app_core_vram_monitor_rationale_59",
+      "backend_app_core_vram_monitor_rationale_64",
+      "backend_app_core_vram_monitor_rationale_69",
+      "backend_app_core_vram_monitor_rationale_78",
+      "backend_app_core_vram_monitor_vramtracker",
+      "backend_app_core_vram_monitor_vramtracker_get_metrics",
+      "backend_app_core_vram_monitor_vramtracker_get_metrics_summarise",
+      "backend_app_core_vram_monitor_vramtracker_init",
+      "backend_app_core_vram_monitor_vramtracker_record_cold_start",
+      "backend_app_core_vram_monitor_vramtracker_record_warm_inference",
+      "backend_app_core_vram_monitor_vramtracker_snapshot_vram"
+    ],
+    "8": [
+      "backend_app_core_config",
+      "backend_app_core_config_get_settings",
+      "backend_app_core_config_rationale_1",
+      "backend_app_core_config_rationale_12",
+      "backend_app_core_config_rationale_46",
+      "backend_app_core_config_rationale_58",
+      "backend_app_core_config_settings",
+      "backend_app_core_config_settings_config",
+      "backend_app_core_config_settings_effective_device",
+      "basesettings",
+      "functools",
+      "pydantic_settings",
+      "torch"
+    ],
+    "9": [
+      "backend_app_api_routes_ocr_ocr_image",
+      "backend_app_api_routes_ocr_ocrresponse",
+      "backend_app_api_routes_ocr_py_basemodel",
+      "backend_app_api_routes_ocr_py_modelmanager",
+      "backend_app_api_routes_ocr_py_post",
+      "backend_app_api_routes_ocr_py_uploadfile",
+      "backend_app_api_routes_ocr_rationale_25",
+      "backend_app_api_routes_ocr_rationale_43"
+    ],
+    "10": [
+      "mobile_tsconfig",
+      "mobile_tsconfig_compileroptions",
+      "mobile_tsconfig_compileroptions_baseurl",
+      "mobile_tsconfig_compileroptions_paths",
+      "mobile_tsconfig_compileroptions_strict",
+      "mobile_tsconfig_extends",
+      "ref_expo_tsconfig_base"
+    ],
+    "11": [
+      "backend_app_api_routes_metrics_get_metrics",
+      "backend_app_api_routes_metrics_py_modelmanager",
+      "backend_app_api_routes_metrics_rationale_24",
+      "get"
+    ],
+    "12": [
+      "backend_app_api_init"
+    ],
+    "13": [
+      "backend_app_core_init"
+    ],
+    "14": [
+      "backend_app_init"
+    ],
+    "15": [
+      "backend_app_schemas_init"
+    ],
+    "16": [
+      "mobile_babel_config"
+    ]
+  },
+  "cohesion": {
+    "0": 0.07259528130671507,
+    "1": 0.05697278911564626,
+    "2": 0.09407665505226481,
+    "3": 0.09420289855072464,
+    "4": 0.13852813852813853,
+    "5": 0.11764705882352941,
+    "6": 0.2,
+    "7": 0.15384615384615385,
+    "8": 0.16666666666666666,
+    "9": 0.25,
+    "10": 0.2857142857142857,
+    "11": 0.5,
+    "12": 1.0,
+    "13": 1.0,
+    "14": 1.0,
+    "15": 1.0,
+    "16": 1.0
+  },
+  "gods": [
+    {
+      "id": "backend_app_api_routes_tts_synthesise_speech",
+      "label": "synthesise_speech()",
+      "degree": 12
+    },
+    {
+      "id": "ref_react",
+      "label": "react",
+      "degree": 12
+    },
+    {
+      "id": "mobile_app_expo",
+      "label": "expo",
+      "degree": 11
+    },
+    {
+      "id": "backend_app_api_routes_asr_transcribe_audio",
+      "label": "transcribe_audio()",
+      "degree": 10
+    },
+    {
+      "id": "mobile_src_screens_translationscreen_translationscreen",
+      "label": "TranslationScreen()",
+      "degree": 10
+    },
+    {
+      "id": "ref_expo_vector_icons",
+      "label": "@expo/vector-icons",
+      "degree": 10
+    },
+    {
+      "id": "ref_react_native",
+      "label": "react-native",
+      "degree": 10
+    },
+    {
+      "id": "backend_app_api_routes_ocr_ocr_image",
+      "label": "ocr_image()",
+      "degree": 9
+    },
+    {
+      "id": "backend_app_api_deps_dep_model_manager",
+      "label": "dep_model_manager()",
+      "degree": 8
+    },
+    {
+      "id": "backend_app_api_routes_translate_translate_text",
+      "label": "translate_text()",
+      "degree": 8
+    }
+  ],
+  "surprises": [
+    {
+      "source": "transcribe_audio()",
+      "target": "ASRResponse",
+      "source_files": [
+        "backend/app/api/routes/asr.py",
+        "backend/app/schemas/asr.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "synthesise_speech()",
+      "target": "TTSResponse",
+      "source_files": [
+        "backend/app/api/routes/tts.py",
+        "backend/app/schemas/tts.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "translate_text()",
+      "target": "TranslateRequest",
+      "source_files": [
+        "backend/app/api/routes/translate.py",
+        "backend/app/schemas/translate.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source"
+    },
+    {
+      "source": "translate_text()",
+      "target": "TranslateResponse",
+      "source_files": [
+        "backend/app/api/routes/translate.py",
+        "backend/app/schemas/translate.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source"
+    },
+    {
+      "source": "health()",
+      "target": "get_vram_info()",
+      "source_files": [
+        "backend/app/main.py",
+        "backend/app/core/vram_monitor.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "peripheral node `health()` unexpectedly reaches hub `get_vram_info()`"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `VRAMTracker` connect `Community 7` to `Community 0`?",
+      "why": "High betweenness centrality (0.026) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `expo/tsconfig.base` to the rest of the system?",
+      "why": "1 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07259528130671507 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `react` connect `Community 2` to `Community 1`?",
+      "why": "High betweenness centrality (0.022) - this node is a cross-community bridge."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.05697278911564626 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 2` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.09407665505226481 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 3` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.09420289855072464 - nodes in this community are weakly interconnected."
+    }
+  ]
+}
