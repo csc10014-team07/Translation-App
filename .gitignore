@@ -218,8 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-# Models
-models/
+# Models (only the root models directory for downloaded model weights)
+/models/
 *.gguf
 *.safetensors
 *.bin

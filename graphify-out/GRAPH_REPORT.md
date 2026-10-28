@@ -1,4 +1,4 @@
-# Graph Report - Translation-App  (2026-10-27)
+# Graph Report - Translation-App  (2026-10-28)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
@@ -9,7 +9,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c5b81ee4`
+- Built from commit: `d36f1d8d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

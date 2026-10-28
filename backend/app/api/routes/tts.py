@@ -44,7 +44,7 @@ def _audio_to_wav_base64(audio_array: np.ndarray, sample_rate: int) -> str:
     response_model=TTSResponse,
     summary="Synthesise speech (non-Vietnamese only)",
     description=(
-        "Convert text to speech using Qwen3-TTS-0.6B. "
+        "Convert text to speech using Pocket TTS. "
         "Vietnamese is **not** supported and will return HTTP 400. "
         "An optional reference audio clip can be supplied for voice cloning."
     ),
