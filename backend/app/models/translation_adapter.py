@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gc
 import logging
+import threading
 import time
 from typing import Any
 
@@ -96,11 +97,13 @@ class TranslationAdapter:
     - Explicit source and target language names and codes.
     - Optional context injected directly into the user prompt.
     - Greedy decoding (temperature=0.0 / do_sample=False) per model card recommendation.
+    Inference calls are protected by a lock for thread-safety.
     """
 
     def __init__(self) -> None:
         self._llm: Any | None = None  # llama_cpp.Llama
         self._loaded: bool = False
+        self._lock = threading.Lock()
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -184,19 +187,20 @@ class TranslationAdapter:
                 "TranslationAdapter.load() must be called before inference."
             )
 
-        messages: list[dict[str, str]] = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": user_message})
+        with self._lock:
+            messages: list[dict[str, str]] = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": user_message})
 
-        response = self._llm.create_chat_completion(
-            messages=messages,
-            temperature=temperature,
-            top_k=top_k,
-            top_p=top_p,
-            max_tokens=2048,
-        )
-        return response["choices"][0]["message"]["content"].strip()
+            response = self._llm.create_chat_completion(
+                messages=messages,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+                max_tokens=2048,
+            )
+            return response["choices"][0]["message"]["content"].strip()
 
     # ── Public API ─────────────────────────────────────────────────────────
 

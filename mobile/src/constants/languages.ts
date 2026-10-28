@@ -14,6 +14,15 @@ export const TARGET_LANGUAGES = [
 
 export type LanguageCode = (typeof TARGET_LANGUAGES)[number]['code'];
 
-export const TTS_SUPPORTED_LANGUAGES = TARGET_LANGUAGES.filter(
-  (l) => l.code !== 'vi',
-);
+export const TTS_SUPPORTED_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'it', name: 'Italian' },
+] as const;
+
+export function isTtsSupported(code: string): boolean {
+  return TTS_SUPPORTED_LANGUAGES.some(lang => lang.code === code);
+}

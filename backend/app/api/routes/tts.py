@@ -23,12 +23,7 @@ from app.schemas.tts import TTSResponse
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["TTS"])
 
-_VIETNAMESE_LANG_CODES = {"vi", "vietnamese", "vie"}
 _SUPPORTED_REF_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
-
-
-def _is_vietnamese(language: str) -> bool:
-    return language.strip().lower() in _VIETNAMESE_LANG_CODES
 
 
 def _audio_to_wav_base64(audio_array: np.ndarray, sample_rate: int) -> str:
@@ -57,12 +52,10 @@ async def synthesise_speech(
     manager: ModelManager = Depends(dep_model_manager),
 ) -> TTSResponse:
     """Synthesise non-Vietnamese speech, optionally with voice cloning."""
-
-    # ── Guard: reject Vietnamese ───────────────────────────────────────────
-    if _is_vietnamese(language):
+    if not text.strip():
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="TTS is not supported for Vietnamese target language.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Text must not be empty.",
         )
 
     ref_audio_path: str | None = None

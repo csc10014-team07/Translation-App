@@ -1,10 +1,8 @@
 """TTS adapter wrapping Pocket TTS."""
 from __future__ import annotations
 
-import gc
 import logging
-import time
-from pathlib import Path
+import threading
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -16,12 +14,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _VIETNAMESE_LANG_CODES = {"vi", "vietnamese", "vie", "tiếng việt"}
-_DEFAULT_SAMPLE_RATE = 24_000
-
-
-def _is_vietnamese(language: str) -> bool:
-    """Return True if *language* refers to Vietnamese."""
-    return language.strip().lower() in _VIETNAMESE_LANG_CODES
 
 # Map language names/codes to Pocket TTS language identifiers
 _POCKET_TTS_LANGUAGE_MAP = {
@@ -43,103 +35,90 @@ _POCKET_TTS_LANGUAGE_MAP = {
     "es": "spanish",
     "spanish": "spanish",
     "spa": "spanish",
-    "nl": "dutch",
-    "dutch": "dutch",
-    "nld": "dutch",
 }
+
+_SUPPORTED_POCKET_TTS_LANGUAGES = {"english", "french", "german", "portuguese", "italian", "spanish"}
+
+
+def _is_vietnamese(language: str) -> bool:
+    """Return True if *language* refers to Vietnamese."""
+    return language.strip().lower() in _VIETNAMESE_LANG_CODES
 
 
 def _map_language_to_pocket_tts(language: str) -> str:
     """Map a language identifier to Pocket TTS language code."""
     lang = language.strip().lower()
-    return _POCKET_TTS_LANGUAGE_MAP.get(lang, "english")
+    return _POCKET_TTS_LANGUAGE_MAP.get(lang, lang)
 
 
 class TTSAdapter:
     """
     Thin wrapper around Pocket TTS for voice synthesis.
 
-    Vietnamese is explicitly **not supported** — calling :meth:`synthesize`
-    with ``language="vi"`` (or any Vietnamese variant) raises a
-    ``ValueError``.
-
-    The adapter uses the Pocket TTS high-level API which supports:
-    - CPU and GPU inference
-    - Voice cloning
-    - Multiple languages: english, french, german, portuguese, italian, spanish, dutch
+    Maintains one Pocket TTS model per language, loaded lazily on CPU.
+    Voice states for default voices are cached per language.
+    Uses per-language locks for thread-safe loading and synthesis.
     """
 
     def __init__(self) -> None:
-        self._model = None
-        self._device: str = "cpu"
-        self._loaded: bool = False
-        self._model_language: str = "english"
+        self._models: dict[str, torch.nn.Module] = {}
+        self._voice_states: dict[str, torch.Tensor] = {}
+        # Create locks for each supported language upfront
+        self._load_locks: dict[str, threading.Lock] = {
+            lang: threading.Lock() for lang in _SUPPORTED_POCKET_TTS_LANGUAGES
+        }
+        self._synth_locks: dict[str, threading.Lock] = {
+            lang: threading.Lock() for lang in _SUPPORTED_POCKET_TTS_LANGUAGES
+        }
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
 
+    def _ensure_model_loaded(self, pocket_lang: str) -> torch.nn.Module:
+        """Load Pocket TTS model for *pocket_lang* if not already loaded."""
+        if pocket_lang not in self._models:
+            lock = self._load_locks[pocket_lang]
+            with lock:
+                if pocket_lang not in self._models:
+                    logger.info("Loading Pocket TTS model for language=%s on CPU...", pocket_lang)
+                    from pocket_tts import TTSModel
+                    self._models[pocket_lang] = TTSModel.load_model(language=pocket_lang)
+                    logger.info("Pocket TTS model loaded for language=%s.", pocket_lang)
+        return self._models[pocket_lang]
+
+    def _get_voice_state(self, pocket_lang: str) -> torch.Tensor:
+        """Get or create cached voice state for the default voice of *pocket_lang*."""
+        if pocket_lang not in self._voice_states:
+            model = self._ensure_model_loaded(pocket_lang)
+            from pocket_tts.default_parameters import get_default_voice_for_language
+            voice_name = get_default_voice_for_language(pocket_lang)
+            self._voice_states[pocket_lang] = model.get_state_for_audio_prompt(voice_name)
+            logger.debug("Cached voice state for language=%s.", pocket_lang)
+        return self._voice_states[pocket_lang]
+
     def load(self, model_language: str | None = None, device: str = "cpu") -> None:
         """
-        Load the Pocket TTS model to *device*.
-
-        Args:
-            model_language: Target language for the model (e.g., "english", "french").
-                           If None, defaults to "english".
-            device:   ``"cuda"`` or ``"cpu"``.
+        Pre-load a specific language model (optional).
+        Models are loaded lazily by default; device is ignored.
         """
-        self._device = device
-        self._model_language = model_language or "english"
-        logger.info("Loading Pocket TTS model (language=%s) to %s ...", self._model_language, device)
-        t0 = time.monotonic()
-
-        try:
-            from pocket_tts import TTSModel
-
-            self._model = TTSModel.load_model(language=self._model_language)
-            if device == "cuda" and torch.cuda.is_available():
-                self._model.to("cuda")
-            self._loaded = True
-            logger.info("Loaded Pocket TTS via pocket_tts package.")
-        except ImportError:
-            raise ImportError(
-                "pocket_tts package is required. Please install it with: pip install pocket-tts"
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to load Pocket TTS model: {exc}") from exc
-
-        elapsed_ms = (time.monotonic() - t0) * 1000
-        logger.info("TTS model loaded in %.0f ms", elapsed_ms)
+        if model_language:
+            pocket_lang = _map_language_to_pocket_tts(model_language)
+            if pocket_lang in _SUPPORTED_POCKET_TTS_LANGUAGES:
+                self._ensure_model_loaded(pocket_lang)
 
     def unload(self) -> None:
-        """Free the model entirely from memory."""
-        logger.info("Unloading Pocket TTS model ...")
-        if self._model is not None:
-            del self._model
-            self._model = None
-        self._loaded = False
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        logger.info("Pocket TTS model unloaded.")
+        """Free all models from memory."""
+        logger.info("Unloading all Pocket TTS models...")
+        self._models.clear()
+        self._voice_states.clear()
+        logger.info("All Pocket TTS models unloaded.")
 
     def unload_to_cpu(self) -> None:
-        """Move model weights to CPU RAM, keeping them in Python for fast reload."""
-        if self._model is None or self._device == "cpu":
-            return
-        logger.info("Moving Pocket TTS model to CPU RAM ...")
-        if hasattr(self._model, "to"):
-            self._model.to("cpu")
-        self._device = "cpu"
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        """No-op for Pocket TTS (always on CPU)."""
+        pass
 
     def load_to_gpu(self, device: str = "cuda") -> None:
-        """Move model weights from CPU RAM back to GPU."""
-        if self._model is None or self._device == device:
-            return
-        logger.info("Moving Pocket TTS model to %s ...", device)
-        if hasattr(self._model, "to"):
-            self._model.to(device)
-        self._device = device
+        """No-op for Pocket TTS (always on CPU)."""
+        pass
 
     # ── Inference ──────────────────────────────────────────────────────────
 
@@ -164,8 +143,9 @@ class TTSAdapter:
             1-D float32 NumPy array and *sample_rate* is typically 24 000.
 
         Raises:
-            ValueError: If *language* is Vietnamese.
-            RuntimeError: If the model has not been loaded.
+            ValueError: If *language* is Vietnamese or not supported by Pocket TTS,
+                       or if reference audio cannot be used.
+            RuntimeError: If model loading fails.
         """
         if _is_vietnamese(language):
             raise ValueError(
@@ -173,49 +153,43 @@ class TTSAdapter:
                 "Vietnamese output is text-only."
             )
 
-        if not self._loaded or self._model is None:
-            raise RuntimeError("TTSAdapter.load() must be called before synthesize().")
-
-        logger.debug("Synthesizing %d chars in language '%s' ...", len(text), language)
-        t0 = time.monotonic()
-
-        # Map language to Pocket TTS language code
         pocket_lang = _map_language_to_pocket_tts(language)
+        
+        if pocket_lang not in _SUPPORTED_POCKET_TTS_LANGUAGES:
+            raise ValueError(
+                f"TTS is not supported for language '{language}'. "
+                f"Supported languages: {sorted(_SUPPORTED_POCKET_TTS_LANGUAGES)}"
+            )
 
-        # Get voice state for reference audio if provided
-        voice_state = None
-        if reference_audio_path:
-            try:
-                voice_state = self._model.get_state_for_audio_prompt(reference_audio_path)
-                logger.info("Using voice cloning from reference audio: %s", reference_audio_path)
-            except Exception as exc:
-                logger.warning("Could not use reference audio for voice cloning: %s", exc)
-                # Fall back to default voice
-                pass
+        model = self._ensure_model_loaded(pocket_lang)
+        synth_lock = self._synth_locks[pocket_lang]
 
-        # Generate audio
-        if voice_state is not None:
-            audio_tensor = self._model.generate_audio(voice_state, text)
-        else:
-            audio_tensor = self._model.generate_audio(text)
+        logger.debug("Synthesizing %d chars in language '%s'...", len(text), language)
 
-        # Convert tensor to numpy array
-        if isinstance(audio_tensor, torch.Tensor):
-            audio_array = audio_tensor.detach().cpu().numpy()
-        else:
-            audio_array = np.array(audio_tensor, dtype=np.float32)
+        with synth_lock:
+            # Use reference audio for voice cloning if provided
+            if reference_audio_path:
+                try:
+                    voice_state = model.get_state_for_audio_prompt(reference_audio_path)
+                except Exception as exc:
+                    raise ValueError(f"Could not use reference audio: {exc}") from exc
+            else:
+                voice_state = self._get_voice_state(pocket_lang)
 
-        # Ensure float32
-        audio_array = audio_array.astype(np.float32)
+            audio_tensor = model.generate_audio(voice_state, text)
 
-        # Get sample rate from model
-        sample_rate = self._model.sample_rate
+            if isinstance(audio_tensor, torch.Tensor):
+                audio_array = audio_tensor.detach().cpu().numpy()
+            else:
+                audio_array = np.array(audio_tensor, dtype=np.float32)
 
-        elapsed_ms = (time.monotonic() - t0) * 1000
-        logger.info("TTS synthesis completed in %.0f ms, sr=%d", elapsed_ms, sample_rate)
-        return audio_array, sample_rate
+            audio_array = audio_array.astype(np.float32)
+            sample_rate = model.sample_rate
+
+            logger.info("TTS synthesis completed, sr=%d", sample_rate)
+            return audio_array, sample_rate
 
     @property
     def is_loaded(self) -> bool:
-        """True if the model has been loaded (regardless of device)."""
-        return self._loaded
+        """True if at least one model has been loaded."""
+        return len(self._models) > 0

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from pathlib import Path
 
@@ -25,8 +26,7 @@ class ASRAdapter:
     ---------
     1. Call :meth:`load` once at startup (device = CUDA).
     2. Use :meth:`transcribe` for inference — the model stays in VRAM permanently.
-    3. :meth:`unload_to_cpu` / :meth:`load_to_gpu` are provided for completeness
-       but PhoASR is **never evicted** in normal operation.
+    3. Inference calls are protected by a lock for thread-safety.
     """
 
     def __init__(self) -> None:
@@ -34,6 +34,7 @@ class ASRAdapter:
         self._model: WhisperForConditionalGeneration | None = None
         self._device: str = "cpu"
         self._loaded: bool = False
+        self._lock = threading.Lock()
 
     # ── Public API ─────────────────────────────────────────────────────────
 
@@ -90,53 +91,68 @@ class ASRAdapter:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         logger.debug("Transcribing '%s' …", audio_path)
-        t0 = time.monotonic()
 
-        # ── Load and resample ──────────────────────────────────────────────
-        try:
-            audio, orig_sr = librosa.load(str(audio_path_obj), sr=None, mono=True)
-        except Exception as exc:
-            raise ValueError(f"Failed to load audio '{audio_path}': {exc}") from exc
+        with self._lock:
+            t0 = time.monotonic()
 
-        if orig_sr != _SAMPLE_RATE:
-            audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=_SAMPLE_RATE)
+            # ── Load and resample ──────────────────────────────────────────────
+            try:
+                audio, orig_sr = librosa.load(str(audio_path_obj), sr=None, mono=True)
+            except Exception as exc:
+                raise ValueError(f"Failed to load audio '{audio_path}': {exc}") from exc
 
-        # ── Feature extraction ─────────────────────────────────────────────
-        inputs = self._processor(
-            audio,
-            sampling_rate=_SAMPLE_RATE,
-            return_tensors="pt",
-        )
-        input_features = inputs.input_features.to(
-            self._device,
-            dtype=torch.float16 if self._device == "cuda" else torch.float32,
-        )
+            if orig_sr != _SAMPLE_RATE:
+                audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=_SAMPLE_RATE)
 
-        # ── Forced Vietnamese decoding ─────────────────────────────────────
-        forced_decoder_ids = self._processor.get_decoder_prompt_ids(
-            language="vi", task="transcribe"
-        )
-
-        with torch.no_grad():
-            predicted_ids = self._model.generate(
-                input_features,
-                forced_decoder_ids=forced_decoder_ids,
+            # ── Feature extraction ─────────────────────────────────────────────
+            inputs = self._processor(
+                audio,
+                sampling_rate=_SAMPLE_RATE,
+                return_tensors="pt",
+            )
+            input_features = inputs.input_features.to(
+                self._device,
+                dtype=torch.float16 if self._device == "cuda" else torch.float32,
             )
 
-        text: str = self._processor.batch_decode(
-            predicted_ids, skip_special_tokens=True
-        )[0].strip()
+            # ── Forced Vietnamese decoding ─────────────────────────────────────
+            forced_decoder_ids = self._processor.get_decoder_prompt_ids(
+                language="vi", task="transcribe"
+            )
 
-        elapsed_ms = (time.monotonic() - t0) * 1000
-        logger.info("Transcription completed in %.0f ms, text length=%d", elapsed_ms, len(text))
+            with torch.no_grad():
+                predicted_ids = self._model.generate(
+                    input_features,
+                    forced_decoder_ids=forced_decoder_ids,
+                )
 
-        return {
-            "text": text,
-            "language": "vi",
-            "word_timestamps": [],  # full timestamp support requires return_timestamps=True
-        }
+            text: str = self._processor.batch_decode(
+                predicted_ids, skip_special_tokens=True
+            )[0].strip()
+
+            elapsed_ms = (time.monotonic() - t0) * 1000
+            logger.info("Transcription completed in %.0f ms, text length=%d", elapsed_ms, len(text))
+
+            return {
+                "text": text,
+                "language": "vi",
+                "word_timestamps": [],  # full timestamp support requires return_timestamps=True
+            }
 
     # ── VRAM lifecycle ─────────────────────────────────────────────────────
+
+    def unload(self) -> None:
+        """Free the model and clear CUDA cache."""
+        logger.info("Unloading ASR model...")
+        if self._model is not None:
+            del self._model
+            self._model = None
+        if self._processor is not None:
+            del self._processor
+            self._processor = None
+        self._loaded = False
+        torch.cuda.empty_cache()
+        logger.info("ASR model unloaded.")
 
     def unload_to_cpu(self) -> None:
         """Move model weights to CPU RAM (keeps them in Python for fast reload)."""

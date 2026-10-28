@@ -122,7 +122,6 @@ export async function synthesizeSpeech(
   text: string,
   language: string,
   referenceAudioUri?: string,
-  referenceText?: string,
 ): Promise<TTSResponse> {
   const form = new FormData();
   form.append('text', text);
@@ -136,9 +135,6 @@ export async function synthesizeSpeech(
       'audio/wav',
       'reference.wav',
     );
-  }
-  if (referenceText) {
-    form.append('reference_text', referenceText);
   }
 
   const response = await apiClient.post<TTSResponse>('/api/tts', form, {

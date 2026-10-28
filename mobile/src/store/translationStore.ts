@@ -6,6 +6,7 @@ import {
   synthesizeSpeech as apiSynthesizeSpeech,
   saveBase64Audio,
 } from '../services/api';
+import { isTtsSupported } from '../constants/languages';
 
 // ──────────────────────────────────────────────
 // Types
@@ -22,11 +23,11 @@ export interface TranslationState {
 
   // ── Output ──
   translatedText: string;
+  translatedLanguage: string;
   sourceLanguage: string;
 
   // ── Voice cloning ──
   referenceAudioUri: string | null;
-  referenceText: string;
   synthesizedAudioUri: string | null;
 
   // ── UI state ──
@@ -45,7 +46,6 @@ export interface TranslationState {
   processImage: (imageUri: string) => Promise<void>;
   translate: () => Promise<void>;
   setReferenceAudio: (uri: string) => void;
-  setReferenceText: (text: string) => void;
   synthesize: () => Promise<void>;
   clearError: () => void;
   reset: () => void;
@@ -61,9 +61,9 @@ const initialState = {
   context: '',
   targetLanguage: 'en',
   translatedText: '',
+  translatedLanguage: '',
   sourceLanguage: '',
   referenceAudioUri: null as string | null,
-  referenceText: '',
   synthesizedAudioUri: null as string | null,
   isTranscribing: false,
   isOcrProcessing: false,
@@ -117,7 +117,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       set({ error: 'Please enter or record Vietnamese text first.' });
       return;
     }
-    set({ isTranslating: true, error: null, translatedText: '' });
+    set({ isTranslating: true, error: null, translatedText: '', synthesizedAudioUri: null });
     try {
       const result = await apiTranslateText(
         vietnameseText,
@@ -126,6 +126,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       );
       set({
         translatedText: result.translated_text,
+        translatedLanguage: targetLanguage,
         sourceLanguage: result.source_language,
       });
     } catch (e: unknown) {
@@ -137,30 +138,26 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
 
   setReferenceAudio: (uri: string) => set({ referenceAudioUri: uri }),
 
-  setReferenceText: (text: string) => set({ referenceText: text }),
-
   synthesize: async () => {
     const {
       translatedText,
-      targetLanguage,
+      translatedLanguage,
       referenceAudioUri,
-      referenceText,
     } = get();
     if (!translatedText.trim()) {
       set({ error: 'Please translate some text first.' });
       return;
     }
-    if (targetLanguage === 'vi') {
-      set({ error: 'TTS is not available for Vietnamese.' });
+    if (!isTtsSupported(translatedLanguage)) {
+      set({ error: 'Voice output is unavailable for this language.' });
       return;
     }
     set({ isSynthesizing: true, error: null, synthesizedAudioUri: null });
     try {
       const result = await apiSynthesizeSpeech(
         translatedText,
-        targetLanguage,
+        translatedLanguage,
         referenceAudioUri ?? undefined,
-        referenceText || undefined,
       );
       const localUri = await saveBase64Audio(result.audio_base64, result.format);
       set({ synthesizedAudioUri: localUri });

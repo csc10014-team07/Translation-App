@@ -244,6 +244,7 @@ web-build/
 *.m4a
 uploads/
 tmp/
+graphify-out/
 
 # OS / editor
 .DS_Store

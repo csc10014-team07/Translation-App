@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -11,15 +10,14 @@ import {
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import VoiceRecorder from './VoiceRecorder';
+import { isTtsSupported } from '../constants/languages';
 
 interface Props {
   translatedText: string;
-  targetLanguage: string;
+  translatedLanguage: string;
   isSynthesizing: boolean;
   synthesizedAudioUri: string | null;
-  referenceText: string;
   onRecordReference: (uri: string) => void;
-  onReferenceTextChange: (text: string) => void;
   onSynthesize: () => void;
 }
 
@@ -28,17 +26,15 @@ const MIN_DURATION_MS = 3000;
 
 export default function VoiceCloningPanel({
   translatedText,
-  targetLanguage,
+  translatedLanguage,
   isSynthesizing,
   synthesizedAudioUri,
-  referenceText,
   onRecordReference,
-  onReferenceTextChange,
   onSynthesize,
 }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
-  const isTtsUnavailable = targetLanguage === 'vi';
+  const isTtsUnavailable = !isTtsSupported(translatedLanguage);
 
   const [referenceRecorded, setReferenceRecorded] = useState(false);
   const [isPlayingOutput, setIsPlayingOutput] = useState(false);
@@ -110,36 +106,19 @@ export default function VoiceCloningPanel({
         <View style={styles.unavailableBox}>
           <Ionicons name="information-circle" size={18} color="#F59E0B" />
           <Text style={styles.unavailableText}>
-            TTS is not available when the target language is Vietnamese.
+            Voice output is unavailable for this language.
           </Text>
         </View>
       ) : (
         <>
-          {/* Reference Voice Recorder */}
+          {/* Voice Recorder */}
           <Text style={[styles.sectionLabel, isDark && styles.textDark]}>
-            1. Record reference voice{' '}
+            Record reference voice{' '}
             <Text style={styles.hint}>(≥ 3 seconds)</Text>
           </Text>
           <VoiceRecorder
             onRecordingComplete={handleReferenceRecorded}
             disabled={isSynthesizing}
-          />
-
-          {/* Reference Text (Optional) */}
-          <Text style={[styles.sectionLabel, isDark && styles.textDark]}>
-            2. Reference text{' '}
-            <Text style={styles.hint}>(optional, improves cloning)</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, isDark && styles.textInputDark]}
-            value={referenceText}
-            onChangeText={onReferenceTextChange}
-            placeholder="Type what you said in the reference recording..."
-            placeholderTextColor={isDark ? '#555' : '#bbb'}
-            multiline
-            numberOfLines={2}
-            textAlignVertical="top"
-            editable={!isSynthesizing}
           />
 
           {/* Synthesize Button */}
