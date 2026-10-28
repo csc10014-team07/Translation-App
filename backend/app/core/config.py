@@ -20,7 +20,6 @@ class Settings(BaseSettings):
     MODELS_DIR: str = "./models"
     PHOASR_MODEL_ID: str = "Qualcomm-AI-Research/PhoASR-whisper-small"
     GEMMA_GGUF_PATH: str = "./models/gemma/translategemma-4b-it.Q5_K_M.gguf"
-    POCKET_TTS_LANGUAGE: str = "english"
 
     # ── Compute device ─────────────────────────────────────────────────────
     DEVICE: str = "cuda"

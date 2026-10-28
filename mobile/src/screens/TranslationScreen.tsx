@@ -31,8 +31,8 @@ export default function TranslationScreen() {
     context,
     targetLanguage,
     translatedText,
+    translatedLanguage,
     sourceLanguage,
-    referenceText,
     synthesizedAudioUri,
     isTranscribing,
     isOcrProcessing,
@@ -47,7 +47,6 @@ export default function TranslationScreen() {
     processImage,
     translate,
     setReferenceAudio,
-    setReferenceText,
     synthesize,
     clearError,
   } = useTranslationStore();
@@ -201,12 +200,10 @@ export default function TranslationScreen() {
       {/* ── Voice Cloning Panel ── */}
       <VoiceCloningPanel
         translatedText={translatedText}
-        targetLanguage={targetLanguage}
+        translatedLanguage={translatedLanguage}
         isSynthesizing={isSynthesizing}
         synthesizedAudioUri={synthesizedAudioUri}
-        referenceText={referenceText}
         onRecordReference={setReferenceAudio}
-        onReferenceTextChange={setReferenceText}
         onSynthesize={synthesize}
       />
     </ScrollView>
