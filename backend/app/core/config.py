@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     GEMMA_N_GPU_LAYERS: int = -1  # -1 = all layers on GPU
 
     # ── Audio constraints ──────────────────────────────────────────────────
-    MAX_AUDIO_DURATION_S: float = 60.0
+    MAX_AUDIO_DURATION_S: float = 30.0
 
     # ── Server options ─────────────────────────────────────────────────────
     API_PREFIX: str = "/api"

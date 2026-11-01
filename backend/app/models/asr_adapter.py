@@ -62,7 +62,11 @@ class ASRAdapter:
         elapsed_ms = (time.monotonic() - t0) * 1000
         logger.info("ASR model loaded in %.0f ms", elapsed_ms)
 
-    def transcribe(self, audio_path: str) -> dict:
+    def transcribe(
+        self,
+        audio_path: str,
+        max_duration_s: float | None = None,
+    ) -> dict:
         """
         Transcribe a Vietnamese audio file.
 
@@ -71,7 +75,8 @@ class ASRAdapter:
         language.
 
         Args:
-            audio_path: Absolute or relative path to the audio file.
+            audio_path:     Absolute or relative path to the audio file.
+            max_duration_s: Optional maximum audio duration in seconds.
 
         Returns:
             A dict with keys:
@@ -82,6 +87,7 @@ class ASRAdapter:
         Raises:
             RuntimeError: If the model has not been loaded yet.
             FileNotFoundError: If *audio_path* does not exist.
+            ValueError: If audio cannot be loaded or exceeds *max_duration_s*.
         """
         if not self._loaded or self._model is None or self._processor is None:
             raise RuntimeError("ASRAdapter.load() must be called before transcribe().")
@@ -100,6 +106,12 @@ class ASRAdapter:
                 audio, orig_sr = librosa.load(str(audio_path_obj), sr=None, mono=True)
             except Exception as exc:
                 raise ValueError(f"Failed to load audio '{audio_path}': {exc}") from exc
+
+            duration_s = float(len(audio)) / float(orig_sr)
+            if max_duration_s is not None and duration_s > max_duration_s:
+                raise ValueError(
+                    f"Audio duration ({duration_s:.1f} s) exceeds maximum allowed duration ({max_duration_s:.1f} s)."
+                )
 
             if orig_sr != _SAMPLE_RATE:
                 audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=_SAMPLE_RATE)
