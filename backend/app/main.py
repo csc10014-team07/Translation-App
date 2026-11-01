@@ -68,7 +68,7 @@ def create_app() -> FastAPI:
         title="Translation App API",
         description=(
             "Vietnamese Translation App backend — ASR (PhoASR), "
-            "Translation & OCR (Gemma 3 4B), TTS (Qwen3-TTS)."
+            "Translation & OCR (TranslateGemma 4B), TTS (Pocket TTS)."
         ),
         version="1.0.0",
         lifespan=lifespan,
