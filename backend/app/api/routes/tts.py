@@ -49,7 +49,6 @@ async def synthesise_speech(
     text: str = Form(..., description="Text to synthesise."),
     language: str = Form(..., description="Spoken language (e.g. 'English', 'French')."),
     reference_audio: UploadFile | None = None,
-    reference_text: str | None = Form(default=None, description="Transcript of the reference audio."),
     manager: ModelManager = Depends(dep_model_manager),
 ) -> TTSResponse:
     """Synthesise non-Vietnamese speech, optionally with voice cloning."""
@@ -92,7 +91,6 @@ async def synthesise_speech(
                 text=text,
                 language=language,
                 reference_audio_path=ref_audio_path,
-                reference_text=reference_text,
             ),
         )
         elapsed_ms = (time.monotonic() - t0) * 1000

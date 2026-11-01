@@ -15,10 +15,6 @@ class TTSRequest(BaseModel):
             "Vietnamese is **not** supported and will be rejected with HTTP 400."
         ),
     )
-    reference_text: str | None = Field(
-        default=None,
-        description="Transcript of the reference audio clip for voice cloning.",
-    )
 
 
 class TTSResponse(BaseModel):
