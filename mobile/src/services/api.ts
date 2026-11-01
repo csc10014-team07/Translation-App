@@ -61,6 +61,32 @@ function appendFileToForm(
   } as unknown as Blob);
 }
 
+function getAudioFileInfo(
+  uri: string,
+  fallbackName: string,
+): { fileName: string; mimeType: string } {
+  const rawName = uri.split('/').pop()?.split('?')[0] ?? fallbackName;
+  const ext = rawName.split('.').pop()?.toLowerCase() ?? '';
+  const fileName = rawName.includes('.') ? rawName : `${fallbackName}.${ext || 'm4a'}`;
+
+  let mimeType = 'audio/wav';
+  if (ext === 'm4a') {
+    mimeType = 'audio/m4a';
+  } else if (ext === 'mp3') {
+    mimeType = 'audio/mpeg';
+  } else if (ext === 'flac') {
+    mimeType = 'audio/flac';
+  } else if (ext === 'ogg') {
+    mimeType = 'audio/ogg';
+  } else if (ext === 'webm') {
+    mimeType = 'audio/webm';
+  } else if (ext === 'wav') {
+    mimeType = 'audio/wav';
+  }
+
+  return { fileName, mimeType };
+}
+
 // ──────────────────────────────────────────────
 // API functions
 // ──────────────────────────────────────────────
@@ -70,7 +96,8 @@ function appendFileToForm(
  */
 export async function transcribeAudio(audioUri: string): Promise<ASRResponse> {
   const form = new FormData();
-  appendFileToForm(form, 'audio', audioUri, 'audio/wav', 'recording.wav');
+  const { fileName, mimeType } = getAudioFileInfo(audioUri, 'recording.m4a');
+  appendFileToForm(form, 'audio', audioUri, mimeType, fileName);
 
   const response = await apiClient.post<ASRResponse>('/api/asr', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -128,12 +155,16 @@ export async function synthesizeSpeech(
   form.append('language', language);
 
   if (referenceAudioUri) {
+    const { fileName, mimeType } = getAudioFileInfo(
+      referenceAudioUri,
+      'reference.m4a',
+    );
     appendFileToForm(
       form,
       'reference_audio',
       referenceAudioUri,
-      'audio/wav',
-      'reference.wav',
+      mimeType,
+      fileName,
     );
   }
 
