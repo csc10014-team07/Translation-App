@@ -14,6 +14,7 @@ Shutdown sequence
 from __future__ import annotations
 
 import logging
+import shutil
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -41,6 +42,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle startup and shutdown events."""
     manager = get_model_manager()
     logger.info("=== Translation App starting up ===")
+    if not shutil.which("ffmpeg"):
+        logger.warning(
+            "ffmpeg was not found on PATH. Decoding non-WAV audio (e.g. .m4a recordings from mobile) "
+            "requires ffmpeg. Please install ffmpeg on the host system."
+        )
     logger.info("Device: %s", settings.effective_device())
     logger.info("VRAM at boot: %s", get_vram_info())
 
