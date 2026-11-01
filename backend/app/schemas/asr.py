@@ -11,6 +11,14 @@ class ASRResponse(BaseModel):
     language_detected: str = Field(
         ..., description="ISO 639-1 language code of the transcribed audio."
     )
+    duration: float | None = Field(
+        default=None,
+        description="Audio duration in seconds.",
+    )
+    elapsed_ms: float = Field(
+        default=0.0,
+        description="Processing latency in milliseconds.",
+    )
     word_timestamps: list[dict] | None = Field(
         default=None,
         description=(
@@ -18,3 +26,4 @@ class ASRResponse(BaseModel):
             "Each entry typically has ``word``, ``start``, and ``end`` keys."
         ),
     )
+

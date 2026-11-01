@@ -38,6 +38,7 @@ export default function TranslationScreen() {
     isOcrProcessing,
     isTranslating,
     isSynthesizing,
+    isStreaming,
     error,
     setInputMode,
     setVietnameseText,
@@ -49,6 +50,8 @@ export default function TranslationScreen() {
     setReferenceAudio,
     setReferenceText,
     synthesize,
+    startStreaming,
+    stopStreaming,
     clearError,
   } = useTranslationStore();
 
@@ -109,9 +112,40 @@ export default function TranslationScreen() {
 
       {inputMode === 'voice' && (
         <>
+          <View style={styles.streamControlRow}>
+            <TouchableOpacity
+              style={[
+                styles.streamButton,
+                isStreaming ? styles.streamButtonActive : styles.streamButtonInactive,
+              ]}
+              onPress={() => (isStreaming ? stopStreaming() : startStreaming())}
+            >
+              <Ionicons
+                name={isStreaming ? 'radio' : 'radio-outline'}
+                size={16}
+                color={isStreaming ? '#fff' : PRIMARY}
+              />
+              <Text
+                style={[
+                  styles.streamButtonText,
+                  { color: isStreaming ? '#fff' : PRIMARY },
+                ]}
+              >
+                {isStreaming ? 'Stop Live WebSocket Stream' : '⚡ Start Live WebSocket Stream'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {isStreaming && (
+            <View style={styles.processingRow}>
+              <ActivityIndicator color={PRIMARY} size="small" />
+              <Text style={[styles.processingText, isDark && styles.textDark]}>
+                Streaming live audio & tokens over /ws/stream…
+              </Text>
+            </View>
+          )}
           <VoiceRecorder
             onRecordingComplete={handleVoiceRecorded}
-            disabled={isTranscribing}
+            disabled={isTranscribing || isStreaming}
           />
           {isTranscribing && (
             <View style={styles.processingRow}>
@@ -333,5 +367,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  streamControlRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  streamButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    gap: 8,
+    borderWidth: 1.5,
+  },
+  streamButtonInactive: {
+    borderColor: PRIMARY,
+    backgroundColor: 'transparent',
+  },
+  streamButtonActive: {
+    borderColor: '#EF4444',
+    backgroundColor: '#EF4444',
+  },
+  streamButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

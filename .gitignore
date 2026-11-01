@@ -218,8 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-# Models (only the root models directory for downloaded model weights)
+# Models (weights and checkpoints)
 /models/
+!backend/app/models/
 *.gguf
 *.safetensors
 *.bin
@@ -244,7 +245,6 @@ web-build/
 *.m4a
 uploads/
 tmp/
-graphify-out/
 
 # OS / editor
 .DS_Store

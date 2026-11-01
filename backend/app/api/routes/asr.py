@@ -11,7 +11,6 @@ import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from app.api.deps import dep_model_manager
-from app.core.config import settings
 from app.core.vram_monitor import vram_tracker
 from app.models.manager import ModelManager
 from app.schemas.asr import ASRResponse
@@ -61,6 +60,11 @@ async def transcribe_audio(
             )
         chunks.append(chunk)
     raw_bytes = b"".join(chunks)
+    if len(raw_bytes) < 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Audio file is empty or too short to be processed.",
+        )
 
     # ── Save to a temp file ────────────────────────────────────────────────
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -82,6 +86,8 @@ async def transcribe_audio(
         return ASRResponse(
             text=result["text"],
             language_detected=result.get("language", "vi"),
+            duration=result.get("duration"),
+            elapsed_ms=round(elapsed_ms, 2),
             word_timestamps=result.get("word_timestamps") or None,
         )
 
@@ -91,7 +97,26 @@ async def transcribe_audio(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except Exception as exc:
-        logger.exception("Unexpected error during ASR: %s", exc)
+        err_msg = str(exc)
+        exc_type = type(exc).__name__
+        if (
+            "Format not recognised" in err_msg
+            or "LibsndfileError" in exc_type
+            or "SoundFileError" in exc_type
+            or "AVError" in exc_type
+            or "InvalidDataError" in exc_type
+            or "corrupted" in err_msg.lower()
+            or "Error opening" in err_msg
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unreadable audio content: {err_msg}",
+            ) from exc
+        logger.exception("Unexpected error during ASR")
         raise HTTPException(status_code=500, detail="ASR failed. See server logs.") from exc
     finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        try:
+            Path(tmp_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+

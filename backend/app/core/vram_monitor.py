@@ -19,7 +19,7 @@ def get_vram_info() -> dict[str, float]:
         is 0.0.
     """
     if not torch.cuda.is_available():
-        return {"used_mb": 0.0, "free_mb": 0.0, "total_mb": 0.0}
+        return {"used_mb": 0.0, "free_mb": 0.0, "total_mb": 0.0, "allocated_mb": 0.0}
 
     props = torch.cuda.get_device_properties(0)
     total_bytes: int = props.total_memory

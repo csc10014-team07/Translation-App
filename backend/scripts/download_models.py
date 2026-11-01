@@ -5,10 +5,9 @@ Model download helper script.
 Downloads the required model weights into local storage:
 1. PhoASR-whisper-small -> models/phoasr
 2. TranslateGemma 4B GGUF (Q5_K_M) -> models/gemma/translategemma-4b-it.Q5_K_M.gguf
-3. Pocket TTS models -> installed via pip (pocket-tts package handles automatic download)
+3. Qwen3-TTS-12Hz-0.6B-Base -> models/qwen_tts
 """
 import argparse
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -70,14 +69,18 @@ def download_gemma_gguf(target_file: Path) -> None:
         )
 
 
-def download_pocket_tts_info() -> None:
-    """
-    Pocket TTS models are automatically downloaded by the pocket-tts package.
-    No manual download needed. Just install with: pip install pocket-tts
-    """
-    print("\n[3/3] Pocket TTS models are handled automatically by the pocket-tts package.")
-    print("       No manual download required.")
-    print("       To use: pip install pocket-tts")
+def download_qwen_tts(target_dir: Path) -> None:
+    """Download Qwen3-TTS 0.6B Base model files."""
+    model_id = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    print(f"\n[3/3] Downloading Qwen3-TTS ({model_id}) to {target_dir}...")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_download(
+        repo_id=model_id,
+        local_dir=str(target_dir),
+        local_dir_use_symlinks=False,
+        resume_download=True,
+    )
+    print(f"Qwen3-TTS download complete: {target_dir}")
 
 
 def main() -> None:
@@ -101,7 +104,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-tts",
         action="store_true",
-        help="Skip Pocket TTS info message",
+        help="Skip downloading Qwen3-TTS model",
     )
     args = parser.parse_args()
 
@@ -111,6 +114,7 @@ def main() -> None:
 
     phoasr_dir = base_dir / "phoasr"
     gemma_file = base_dir / "gemma" / "translategemma-4b-it.Q5_K_M.gguf"
+    tts_dir = base_dir / "qwen_tts"
 
     if not args.skip_phoasr:
         download_phoasr(phoasr_dir)
@@ -119,7 +123,7 @@ def main() -> None:
         download_gemma_gguf(gemma_file)
 
     if not args.skip_tts:
-        download_pocket_tts_info()
+        download_qwen_tts(tts_dir)
 
     print("\n[Done] All requested models downloaded or configured successfully.")
 

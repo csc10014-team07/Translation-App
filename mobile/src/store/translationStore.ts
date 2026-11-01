@@ -6,7 +6,7 @@ import {
   synthesizeSpeech as apiSynthesizeSpeech,
   saveBase64Audio,
 } from '../services/api';
-import { isTtsSupported } from '../constants/languages';
+import { StreamClient } from '../services/stream';
 
 // ──────────────────────────────────────────────
 // Types
@@ -23,11 +23,11 @@ export interface TranslationState {
 
   // ── Output ──
   translatedText: string;
-  translatedLanguage: string;
   sourceLanguage: string;
 
   // ── Voice cloning ──
   referenceAudioUri: string | null;
+  referenceText: string;
   synthesizedAudioUri: string | null;
 
   // ── UI state ──
@@ -35,6 +35,7 @@ export interface TranslationState {
   isOcrProcessing: boolean;
   isTranslating: boolean;
   isSynthesizing: boolean;
+  isStreaming: boolean;
   error: string | null;
 
   // ── Actions ──
@@ -46,7 +47,11 @@ export interface TranslationState {
   processImage: (imageUri: string) => Promise<void>;
   translate: () => Promise<void>;
   setReferenceAudio: (uri: string) => void;
+  setReferenceText: (text: string) => void;
   synthesize: () => Promise<void>;
+  startStreaming: (customUrl?: string) => Promise<void>;
+  stopStreaming: () => void;
+  sendStreamingAudio: (chunk: ArrayBuffer | Uint8Array) => void;
   clearError: () => void;
   reset: () => void;
 }
@@ -55,20 +60,23 @@ export interface TranslationState {
 // Default / initial state values
 // ──────────────────────────────────────────────
 
+let activeStreamClient: StreamClient | null = null;
+
 const initialState = {
   inputMode: 'text' as InputMode,
   vietnameseText: '',
   context: '',
   targetLanguage: 'en',
   translatedText: '',
-  translatedLanguage: '',
   sourceLanguage: '',
   referenceAudioUri: null as string | null,
+  referenceText: '',
   synthesizedAudioUri: null as string | null,
   isTranscribing: false,
   isOcrProcessing: false,
   isTranslating: false,
   isSynthesizing: false,
+  isStreaming: false,
   error: null as string | null,
 };
 
@@ -100,10 +108,18 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
   },
 
   processImage: async (imageUri: string) => {
+    const { targetLanguage, context } = get();
     set({ isOcrProcessing: true, error: null });
     try {
-      const result = await apiOcrImage(imageUri);
-      set({ vietnameseText: result.vietnamese_text });
+      const result = await apiOcrImage(
+        imageUri,
+        targetLanguage || undefined,
+        context || undefined,
+      );
+      set({
+        vietnameseText: result.vietnamese_text,
+        translatedText: result.translated_text || get().translatedText,
+      });
     } catch (e: unknown) {
       set({ error: extractErrorMessage(e, 'Failed to process image.') });
     } finally {
@@ -117,7 +133,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       set({ error: 'Please enter or record Vietnamese text first.' });
       return;
     }
-    set({ isTranslating: true, error: null, translatedText: '', synthesizedAudioUri: null });
+    set({ isTranslating: true, error: null, translatedText: '' });
     try {
       const result = await apiTranslateText(
         vietnameseText,
@@ -126,7 +142,6 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       );
       set({
         translatedText: result.translated_text,
-        translatedLanguage: targetLanguage,
         sourceLanguage: result.source_language,
       });
     } catch (e: unknown) {
@@ -138,26 +153,26 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
 
   setReferenceAudio: (uri: string) => set({ referenceAudioUri: uri }),
 
+  setReferenceText: (text: string) => set({ referenceText: text }),
+
   synthesize: async () => {
     const {
       translatedText,
-      translatedLanguage,
+      targetLanguage,
       referenceAudioUri,
+      referenceText,
     } = get();
     if (!translatedText.trim()) {
       set({ error: 'Please translate some text first.' });
-      return;
-    }
-    if (!isTtsSupported(translatedLanguage)) {
-      set({ error: 'Voice output is unavailable for this language.' });
       return;
     }
     set({ isSynthesizing: true, error: null, synthesizedAudioUri: null });
     try {
       const result = await apiSynthesizeSpeech(
         translatedText,
-        translatedLanguage,
+        targetLanguage,
         referenceAudioUri ?? undefined,
+        referenceText || undefined,
       );
       const localUri = await saveBase64Audio(result.audio_base64, result.format);
       set({ synthesizedAudioUri: localUri });
@@ -168,9 +183,64 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
     }
   },
 
+  startStreaming: async (customUrl?: string) => {
+    const { targetLanguage, context, referenceAudioUri } = get();
+    if (activeStreamClient) {
+      activeStreamClient.disconnect();
+      activeStreamClient = null;
+    }
+    set({ isStreaming: true, error: null, translatedText: '' });
+    const client = new StreamClient({
+      sourceLang: 'vi',
+      targetLang: targetLanguage || 'en',
+      customContext: context || '',
+      cloneVoice: !!referenceAudioUri,
+      onAsrInterim: (text) => set({ vietnameseText: text }),
+      onAsrFinal: (text) => set({ vietnameseText: text }),
+      onTransDelta: (token) => set((s) => ({ translatedText: s.translatedText + token })),
+      onTransFinal: (text) => set({ translatedText: text }),
+      onAudioChunk: async (b64) => {
+        try {
+          const uri = await saveBase64Audio(b64, 'wav');
+          set({ synthesizedAudioUri: uri });
+        } catch {
+          // ignore cache write error
+        }
+      },
+      onError: (err) => set({ error: err, isStreaming: false }),
+      onClose: () => set({ isStreaming: false }),
+    });
+    try {
+      await client.connect(customUrl);
+      activeStreamClient = client;
+    } catch (e: unknown) {
+      set({ error: extractErrorMessage(e, 'Failed to connect streaming WebSocket.'), isStreaming: false });
+    }
+  },
+
+  stopStreaming: () => {
+    if (activeStreamClient) {
+      activeStreamClient.disconnect();
+      activeStreamClient = null;
+    }
+    set({ isStreaming: false });
+  },
+
+  sendStreamingAudio: (chunk: ArrayBuffer | Uint8Array) => {
+    if (activeStreamClient) {
+      activeStreamClient.sendAudioChunk(chunk);
+    }
+  },
+
   clearError: () => set({ error: null }),
 
-  reset: () => set({ ...initialState }),
+  reset: () => {
+    if (activeStreamClient) {
+      activeStreamClient.disconnect();
+      activeStreamClient = null;
+    }
+    set({ ...initialState });
+  },
 }));
 
 // ──────────────────────────────────────────────

@@ -3,9 +3,29 @@ import logging
 from functools import lru_cache
 
 import torch
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _resolve_effective_device(device_setting: str) -> str:
+    """Evaluate and cache effective device availability with fallback to CPU."""
+    if device_setting.startswith("cuda"):
+        if not torch.cuda.is_available():
+            logger.warning("CUDA requested but torch.cuda.is_available() is False — falling back to CPU.")
+            return "cpu"
+        try:
+            # Test kernel execution (catches older compute capability mismatch)
+            t = torch.tensor([1.0], device="cuda")
+            _ = t * 2
+            return "cuda"
+        except Exception as e:
+            logger.warning(
+                f"CUDA is present but kernel test failed ({e}) — falling back to CPU."
+            )
+            return "cpu"
+    return device_setting
 
 
 class Settings(BaseSettings):
@@ -20,7 +40,6 @@ class Settings(BaseSettings):
     MODELS_DIR: str = "./models"
     PHOASR_MODEL_ID: str = "Qualcomm-AI-Research/PhoASR-whisper-small"
     GEMMA_GGUF_PATH: str = "./models/gemma/translategemma-4b-it.Q5_K_M.gguf"
-    POCKET_TTS_LANGUAGE: str = "english"
 
     # ── Compute device ─────────────────────────────────────────────────────
     DEVICE: str = "cuda"
@@ -37,20 +56,16 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     def effective_device(self) -> str:
-        """Return 'cuda' if CUDA is available, otherwise fall back to 'cpu'."""
-        if self.DEVICE == "cuda" and not torch.cuda.is_available():
-            logger.warning(
-                "CUDA requested but not available — falling back to CPU. "
-                "Inference will be significantly slower."
-            )
-            return "cpu"
-        return self.DEVICE
+        """Return 'cuda' if CUDA is actually available and executable, otherwise fall back to 'cpu'."""
+        return _resolve_effective_device(self.DEVICE)
 
 
 @lru_cache(maxsize=1)

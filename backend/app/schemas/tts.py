@@ -8,12 +8,17 @@ class TTSRequest(BaseModel):
     """Request body (JSON) for the ``POST /api/tts`` endpoint."""
 
     text: str = Field(..., description="Text to synthesise into speech.", min_length=1)
-    language: str = Field(
-        ...,
-        description=(
-            "Spoken language of *text* (e.g. 'English', 'French'). "
-            "Vietnamese is **not** supported and will be rejected with HTTP 400."
-        ),
+    language: str | None = Field(
+        default=None,
+        description="Spoken language of *text* (e.g. 'English', 'Vietnamese').",
+    )
+    target_language: str | None = Field(
+        default=None,
+        description="Alias for language (e.g. 'English', 'Vietnamese').",
+    )
+    voice_style: str | None = Field(
+        default=None,
+        description="Optional voice style or persona (e.g. 'male', 'female', 'vi-VN-NamMinhNeural').",
     )
     reference_text: str | None = Field(
         default=None,
@@ -31,3 +36,11 @@ class TTSResponse(BaseModel):
         ..., description="Sample rate of the synthesised audio in Hz."
     )
     format: str = Field(default="wav", description="Audio container format.")
+    engine: str | None = Field(
+        default="edge_tts",
+        description="Synthesis engine used ('pocket_tts' or 'edge_tts').",
+    )
+    elapsed_ms: float | None = Field(
+        default=None,
+        description="Elapsed synthesis time in milliseconds.",
+    )
