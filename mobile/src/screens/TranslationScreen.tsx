@@ -193,7 +193,7 @@ export default function TranslationScreen() {
         <TranslationResult
           translatedText={translatedText}
           sourceLanguage={sourceLanguage}
-          targetLanguage={targetLanguage}
+          targetLanguage={translatedLanguage || targetLanguage}
         />
       ) : null}
 
