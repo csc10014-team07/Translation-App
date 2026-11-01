@@ -112,14 +112,6 @@ class TTSAdapter:
         self._voice_states.clear()
         logger.info("All Pocket TTS models unloaded.")
 
-    def unload_to_cpu(self) -> None:
-        """No-op for Pocket TTS (always on CPU)."""
-        pass
-
-    def load_to_gpu(self, device: str = "cuda") -> None:
-        """No-op for Pocket TTS (always on CPU)."""
-        pass
-
     # ── Inference ──────────────────────────────────────────────────────────
 
     def synthesize(

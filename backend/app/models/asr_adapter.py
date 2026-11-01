@@ -166,24 +166,6 @@ class ASRAdapter:
         torch.cuda.empty_cache()
         logger.info("ASR model unloaded.")
 
-    def unload_to_cpu(self) -> None:
-        """Move model weights to CPU RAM (keeps them in Python for fast reload)."""
-        if self._model is not None and self._device != "cpu":
-            logger.info("Moving ASR model to CPU …")
-            self._model.to("cpu")
-            self._device = "cpu"
-            torch.cuda.empty_cache()
-
-    def load_to_gpu(self, device: str = "cuda") -> None:
-        """Move model weights back to GPU."""
-        if self._model is not None and self._device != device:
-            logger.info("Moving ASR model to %s …", device)
-            self._model.to(
-                device,
-                dtype=torch.float16 if device == "cuda" else torch.float32,
-            )
-            self._device = device
-
     @property
     def is_loaded(self) -> bool:
         """True if the model weights have been loaded (regardless of device)."""
