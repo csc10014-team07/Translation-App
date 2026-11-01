@@ -182,18 +182,35 @@ export async function checkHealth(): Promise<HealthResponse> {
   return response.data;
 }
 
+let lastTtsAudioUri: string | null = null;
+
 /**
  * Decode a base64 audio string returned by TTS and save it to a temp file.
+ * Cleans up the previously generated audio file to avoid leaking disk space.
  * Returns the local URI of the saved file.
  */
 export async function saveBase64Audio(
   base64: string,
   format: string,
+  previousUri?: string | null,
 ): Promise<string> {
+  const fileToDelete = previousUri || lastTtsAudioUri;
+  if (fileToDelete) {
+    try {
+      const info = await FileSystem.getInfoAsync(fileToDelete);
+      if (info.exists) {
+        await FileSystem.deleteAsync(fileToDelete, { idempotent: true });
+      }
+    } catch {
+      // Ignore cache cleanup failure
+    }
+  }
+
   const ext = format ?? 'wav';
-  const uri = `${FileSystem.cacheDirectory}tts_output.${ext}`;
+  const uri = `${FileSystem.cacheDirectory}tts_output_${Date.now()}.${ext}`;
   await FileSystem.writeAsStringAsync(uri, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
+  lastTtsAudioUri = uri;
   return uri;
 }
