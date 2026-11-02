@@ -66,12 +66,15 @@ function getAudioFileInfo(
   fallbackName: string,
 ): { fileName: string; mimeType: string } {
   const rawName = uri.split('/').pop()?.split('?')[0] ?? fallbackName;
-  const ext = rawName.split('.').pop()?.toLowerCase() ?? '';
-  const fileName = rawName.includes('.') ? rawName : `${fallbackName}.${ext || 'm4a'}`;
+  const dotIndex = rawName.lastIndexOf('.');
+  const ext = dotIndex !== -1 ? rawName.slice(dotIndex + 1).toLowerCase() : 'm4a';
+  const fileName = dotIndex !== -1 ? rawName : `${rawName}.${ext}`;
 
-  let mimeType = 'audio/wav';
-  if (ext === 'm4a') {
-    mimeType = 'audio/m4a';
+  let mimeType = 'application/octet-stream';
+  if (ext === 'm4a' || ext === 'mp4') {
+    mimeType = 'audio/mp4';
+  } else if (ext === 'wav') {
+    mimeType = 'audio/wav';
   } else if (ext === 'mp3') {
     mimeType = 'audio/mpeg';
   } else if (ext === 'flac') {
@@ -80,8 +83,6 @@ function getAudioFileInfo(
     mimeType = 'audio/ogg';
   } else if (ext === 'webm') {
     mimeType = 'audio/webm';
-  } else if (ext === 'wav') {
-    mimeType = 'audio/wav';
   }
 
   return { fileName, mimeType };
