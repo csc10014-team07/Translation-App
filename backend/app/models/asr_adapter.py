@@ -12,6 +12,8 @@ import soundfile as sf
 import torch
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 16_000  # Whisper expects 16 kHz input
@@ -38,20 +40,49 @@ class ASRAdapter:
 
     # ── Public API ─────────────────────────────────────────────────────────
 
-    def load(self, model_id: str, device: str) -> None:
+    def load(
+        self,
+        model_id: str,
+        device: str,
+        cache_dir: str | Path | None = None,
+    ) -> None:
         """
         Load PhoASR Whisper model to *device* in FP16.
 
         Args:
-            model_id: HuggingFace model ID, e.g. ``"Qualcomm-AI-Research/PhoASR-whisper-small"``.
-            device:   ``"cuda"`` or ``"cpu"``.
+            model_id:  HuggingFace model ID, e.g. ``"Qualcomm-AI-Research/PhoASR-whisper-small"``.
+            device:    ``"cuda"`` or ``"cpu"``.
+            cache_dir: Optional cache directory for model weights. If omitted,
+                       derived from ``settings.MODELS_DIR`` relative to ``backend/``.
         """
-        logger.info("Loading ASR model '%s' to %s …", model_id, device)
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        if cache_dir is None:
+            models_path = Path(settings.MODELS_DIR)
+            resolved_cache_dir = (
+                models_path if models_path.is_absolute() else (backend_dir / models_path).resolve()
+            )
+        else:
+            p = Path(cache_dir)
+            resolved_cache_dir = p if p.is_absolute() else (backend_dir / p).resolve()
+
+        resolved_cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir_str = str(resolved_cache_dir)
+
+        logger.info(
+            "Loading ASR model '%s' to %s using cache directory: %s …",
+            model_id,
+            device,
+            cache_dir_str,
+        )
         t0 = time.monotonic()
 
-        self._processor = WhisperProcessor.from_pretrained(model_id)
+        self._processor = WhisperProcessor.from_pretrained(
+            model_id,
+            cache_dir=cache_dir_str,
+        )
         self._model = WhisperForConditionalGeneration.from_pretrained(
             model_id,
+            cache_dir=cache_dir_str,
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
         )
         self._model.eval()
