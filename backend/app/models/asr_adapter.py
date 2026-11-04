@@ -12,6 +12,8 @@ import soundfile as sf
 import torch
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 16_000  # Whisper expects 16 kHz input
@@ -38,20 +40,49 @@ class ASRAdapter:
 
     # ── Public API ─────────────────────────────────────────────────────────
 
-    def load(self, model_id: str, device: str) -> None:
+    def load(
+        self,
+        model_id: str,
+        device: str,
+        cache_dir: str | Path | None = None,
+    ) -> None:
         """
         Load PhoASR Whisper model to *device* in FP16.
 
         Args:
-            model_id: HuggingFace model ID, e.g. ``"Qualcomm-AI-Research/PhoASR-whisper-small"``.
-            device:   ``"cuda"`` or ``"cpu"``.
+            model_id:  HuggingFace model ID, e.g. ``"Qualcomm-AI-Research/PhoASR-whisper-small"``.
+            device:    ``"cuda"`` or ``"cpu"``.
+            cache_dir: Optional cache directory for model weights. If omitted,
+                       derived from ``settings.MODELS_DIR`` relative to ``backend/``.
         """
-        logger.info("Loading ASR model '%s' to %s …", model_id, device)
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        if cache_dir is None:
+            models_path = Path(settings.MODELS_DIR)
+            resolved_cache_dir = (
+                models_path if models_path.is_absolute() else (backend_dir / models_path).resolve()
+            )
+        else:
+            p = Path(cache_dir)
+            resolved_cache_dir = p if p.is_absolute() else (backend_dir / p).resolve()
+
+        resolved_cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir_str = str(resolved_cache_dir)
+
+        logger.info(
+            "Loading ASR model '%s' to %s using cache directory: %s …",
+            model_id,
+            device,
+            cache_dir_str,
+        )
         t0 = time.monotonic()
 
-        self._processor = WhisperProcessor.from_pretrained(model_id)
+        self._processor = WhisperProcessor.from_pretrained(
+            model_id,
+            cache_dir=cache_dir_str,
+        )
         self._model = WhisperForConditionalGeneration.from_pretrained(
             model_id,
+            cache_dir=cache_dir_str,
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
         )
         self._model.eval()
@@ -62,7 +93,11 @@ class ASRAdapter:
         elapsed_ms = (time.monotonic() - t0) * 1000
         logger.info("ASR model loaded in %.0f ms", elapsed_ms)
 
-    def transcribe(self, audio_path: str) -> dict:
+    def transcribe(
+        self,
+        audio_path: str,
+        max_duration_s: float | None = None,
+    ) -> dict:
         """
         Transcribe a Vietnamese audio file.
 
@@ -71,7 +106,8 @@ class ASRAdapter:
         language.
 
         Args:
-            audio_path: Absolute or relative path to the audio file.
+            audio_path:     Absolute or relative path to the audio file.
+            max_duration_s: Optional maximum audio duration in seconds.
 
         Returns:
             A dict with keys:
@@ -82,6 +118,7 @@ class ASRAdapter:
         Raises:
             RuntimeError: If the model has not been loaded yet.
             FileNotFoundError: If *audio_path* does not exist.
+            ValueError: If audio cannot be loaded or exceeds *max_duration_s*.
         """
         if not self._loaded or self._model is None or self._processor is None:
             raise RuntimeError("ASRAdapter.load() must be called before transcribe().")
@@ -100,6 +137,12 @@ class ASRAdapter:
                 audio, orig_sr = librosa.load(str(audio_path_obj), sr=None, mono=True)
             except Exception as exc:
                 raise ValueError(f"Failed to load audio '{audio_path}': {exc}") from exc
+
+            duration_s = float(len(audio)) / float(orig_sr)
+            if max_duration_s is not None and duration_s > max_duration_s:
+                raise ValueError(
+                    f"Audio duration ({duration_s:.1f} s) exceeds maximum allowed duration ({max_duration_s:.1f} s)."
+                )
 
             if orig_sr != _SAMPLE_RATE:
                 audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=_SAMPLE_RATE)
@@ -153,24 +196,6 @@ class ASRAdapter:
         self._loaded = False
         torch.cuda.empty_cache()
         logger.info("ASR model unloaded.")
-
-    def unload_to_cpu(self) -> None:
-        """Move model weights to CPU RAM (keeps them in Python for fast reload)."""
-        if self._model is not None and self._device != "cpu":
-            logger.info("Moving ASR model to CPU …")
-            self._model.to("cpu")
-            self._device = "cpu"
-            torch.cuda.empty_cache()
-
-    def load_to_gpu(self, device: str = "cuda") -> None:
-        """Move model weights back to GPU."""
-        if self._model is not None and self._device != device:
-            logger.info("Moving ASR model to %s …", device)
-            self._model.to(
-                device,
-                dtype=torch.float16 if device == "cuda" else torch.float32,
-            )
-            self._device = device
 
     @property
     def is_loaded(self) -> bool:

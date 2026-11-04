@@ -3,9 +3,10 @@
 Model download helper script.
 
 Downloads the required model weights into local storage:
-1. PhoASR-whisper-small -> models/phoasr
-2. TranslateGemma 4B GGUF (Q5_K_M) -> models/gemma/translategemma-4b-it.Q5_K_M.gguf
-3. Pocket TTS models -> installed via pip (pocket-tts package handles automatic download)
+1. TranslateGemma 4B GGUF (Q5_K_M) -> models/gemma/translategemma-4b-it.Q5_K_M.gguf
+2. Pocket TTS models -> installed via pip (pocket-tts package handles automatic download)
+
+PhoASR is loaded by its Hugging Face ID and cached by Hugging Face.
 """
 import argparse
 import os
@@ -23,19 +24,6 @@ except ImportError:
     sys.exit(1)
 
 
-def download_phoasr(target_dir: Path) -> None:
-    """Download PhoASR-whisper-small model files."""
-    model_id = "Qualcomm-AI-Research/PhoASR-whisper-small"
-    print(f"\n[1/3] Downloading PhoASR ({model_id}) to {target_dir}...")
-    target_dir.mkdir(parents=True, exist_ok=True)
-    snapshot_download(
-        repo_id=model_id,
-        local_dir=str(target_dir),
-        local_dir_use_symlinks=False,
-        resume_download=True,
-    )
-    print(f"PhoASR download complete: {target_dir}")
-
 
 def download_gemma_gguf(target_file: Path) -> None:
     """Download TranslateGemma 4B GGUF (Q5_K_M quantization)."""
@@ -44,7 +32,7 @@ def download_gemma_gguf(target_file: Path) -> None:
     target_dir = target_file.parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n[2/3] Downloading TranslateGemma 4B GGUF ({filename}) from {repo_id}...")
+    print(f"\n[1/2] Downloading TranslateGemma 4B GGUF ({filename}) from {repo_id}...")
     if target_file.exists() and target_file.stat().st_size > 1024 * 1024 * 100:
         print(f"File already exists: {target_file} ({target_file.stat().st_size / (1024*1024):.1f} MB)")
         return
@@ -75,7 +63,7 @@ def download_pocket_tts_info() -> None:
     Pocket TTS models are automatically downloaded by the pocket-tts package.
     No manual download needed. Just install with: pip install pocket-tts
     """
-    print("\n[3/3] Pocket TTS models are handled automatically by the pocket-tts package.")
+    print("\n[2/2] Pocket TTS models are handled automatically by the pocket-tts package.")
     print("       No manual download required.")
     print("       To use: pip install pocket-tts")
 
@@ -109,11 +97,7 @@ def main() -> None:
     base_dir.mkdir(parents=True, exist_ok=True)
     print(f"Models storage directory: {base_dir}")
 
-    phoasr_dir = base_dir / "phoasr"
     gemma_file = base_dir / "gemma" / "translategemma-4b-it.Q5_K_M.gguf"
-
-    if not args.skip_phoasr:
-        download_phoasr(phoasr_dir)
 
     if not args.skip_gemma:
         download_gemma_gguf(gemma_file)

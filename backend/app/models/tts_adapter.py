@@ -112,14 +112,6 @@ class TTSAdapter:
         self._voice_states.clear()
         logger.info("All Pocket TTS models unloaded.")
 
-    def unload_to_cpu(self) -> None:
-        """No-op for Pocket TTS (always on CPU)."""
-        pass
-
-    def load_to_gpu(self, device: str = "cuda") -> None:
-        """No-op for Pocket TTS (always on CPU)."""
-        pass
-
     # ── Inference ──────────────────────────────────────────────────────────
 
     def synthesize(
@@ -127,7 +119,6 @@ class TTSAdapter:
         text: str,
         language: str,
         reference_audio_path: str | None = None,
-        reference_text: str | None = None,
     ) -> tuple[np.ndarray, int]:
         """
         Synthesize speech for *text*.
@@ -136,7 +127,6 @@ class TTSAdapter:
             text:                   Text to synthesize.
             language:               Target spoken language.
             reference_audio_path:   Path to a reference WAV for voice cloning (optional).
-            reference_text:         Transcript of *reference_audio_path* (optional).
 
         Returns:
             A tuple ``(audio_array, sample_rate)`` where *audio_array* is a

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["TTS"])
 
 _SUPPORTED_REF_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+_MAX_REF_AUDIO_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def _audio_to_wav_base64(audio_array: np.ndarray, sample_rate: int) -> str:
@@ -48,7 +49,6 @@ async def synthesise_speech(
     text: str = Form(..., description="Text to synthesise."),
     language: str = Form(..., description="Spoken language (e.g. 'English', 'French')."),
     reference_audio: UploadFile | None = None,
-    reference_text: str | None = Form(default=None, description="Transcript of the reference audio."),
     manager: ModelManager = Depends(dep_model_manager),
 ) -> TTSResponse:
     """Synthesise non-Vietnamese speech, optionally with voice cloning."""
@@ -71,9 +71,16 @@ async def synthesise_speech(
                 )
             with tempfile.NamedTemporaryFile(suffix=ref_suffix, delete=False) as tmp:
                 ref_audio_path = tmp.name
-            ref_bytes = await reference_audio.read()
+            total_bytes = 0
             async with aiofiles.open(ref_audio_path, "wb") as f:
-                await f.write(ref_bytes)
+                while chunk := await reference_audio.read(65_536):
+                    total_bytes += len(chunk)
+                    if total_bytes > _MAX_REF_AUDIO_SIZE_BYTES:
+                        raise HTTPException(
+                            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            detail="Reference audio file exceeds 20 MB limit.",
+                        )
+                    await f.write(chunk)
 
         # ── Run TTS ────────────────────────────────────────────────────────
         tts = await manager.get_tts()
@@ -84,7 +91,6 @@ async def synthesise_speech(
                 text=text,
                 language=language,
                 reference_audio_path=ref_audio_path,
-                reference_text=reference_text,
             ),
         )
         elapsed_ms = (time.monotonic() - t0) * 1000
