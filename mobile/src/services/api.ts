@@ -65,6 +65,30 @@ export interface HealthResponse {
 // Helpers
 // ──────────────────────────────────────────────
 
+const AUDIO_MIME_MAP: Record<string, string> = {
+  m4a: 'audio/mp4',
+  mp4: 'audio/mp4',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  flac: 'audio/flac',
+  ogg: 'audio/ogg',
+  webm: 'audio/webm',
+};
+
+export function getAudioFileInfo(
+  uri: string,
+  fallbackName: string,
+): { fileName: string; mimeType: string } {
+  const dotIndex = uri.lastIndexOf('.');
+  const ext = dotIndex !== -1 ? uri.substring(dotIndex + 1).toLowerCase() : 'm4a';
+  const mimeType = AUDIO_MIME_MAP[ext] ?? 'application/octet-stream';
+  const lastPart = uri.split('/').pop()?.split('?')[0];
+  const fileName = lastPart && lastPart.includes('.')
+    ? lastPart
+    : (fallbackName.includes('.') ? fallbackName : `${fallbackName}.${ext}`);
+  return { fileName, mimeType };
+}
+
 /**
  * Read a local file URI and append it as a multipart field.
  * expo-file-system is used to convert the uri into a blob-compatible object
@@ -94,7 +118,8 @@ function appendFileToForm(
  */
 export async function transcribeAudio(audioUri: string): Promise<ASRResponse> {
   const form = new FormData();
-  appendFileToForm(form, 'audio', audioUri, 'audio/wav', 'recording.wav');
+  const { fileName, mimeType } = getAudioFileInfo(audioUri, 'recording.m4a');
+  appendFileToForm(form, 'audio', audioUri, mimeType, fileName);
 
   const response = await apiClient.post<ASRResponse>('/api/asr', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -172,12 +197,16 @@ export async function synthesizeSpeech(
   form.append('language', language);
 
   if (referenceAudioUri) {
+    const { fileName, mimeType } = getAudioFileInfo(
+      referenceAudioUri,
+      'reference.m4a',
+    );
     appendFileToForm(
       form,
       'reference_audio',
       referenceAudioUri,
-      'audio/wav',
-      'reference.wav',
+      mimeType,
+      fileName,
     );
   }
   if (referenceText) {
