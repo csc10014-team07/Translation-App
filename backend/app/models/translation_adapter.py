@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import urllib.request
 from collections.abc import Generator
 from pathlib import Path
@@ -53,6 +54,7 @@ class TranslationAdapter:
         self.device = settings.effective_device()
         self._llm = None
         self._ocr = None
+        self._lock = threading.Lock()
 
     def _resolve_model_path(self) -> Path | None:
         candidates = [
@@ -184,13 +186,14 @@ class TranslationAdapter:
         # Tier 1: TranslateGemma 4B GGUF
         if self._llm is not None:
             try:
-                output = self._llm(
-                    prompt,
-                    max_tokens=512,
-                    temperature=0.3,
-                    top_p=0.9,
-                    stop=["<end_of_turn>", "\n\nUser:"],
-                )
+                with self._lock:
+                    output = self._llm(
+                        prompt,
+                        max_tokens=512,
+                        temperature=0.3,
+                        top_p=0.9,
+                        stop=["<end_of_turn>", "\n\nUser:"],
+                    )
                 ans = output["choices"][0]["text"].strip().strip('"')
                 if ans:
                     return (ans, "translategemma-4b") if return_details else ans
@@ -261,16 +264,20 @@ class TranslationAdapter:
 
         if self._llm is not None:
             try:
-                for chunk in self._llm(
-                    prompt,
-                    max_tokens=512,
-                    temperature=0.3,
-                    top_p=0.9,
-                    stop=["<end_of_turn>", "\n\nUser:"],
-                    stream=True,
-                ):
-                    token = chunk["choices"][0]["text"]
-                    yield token
+                self._lock.acquire()
+                try:
+                    for chunk in self._llm(
+                        prompt,
+                        max_tokens=512,
+                        temperature=0.3,
+                        top_p=0.9,
+                        stop=["<end_of_turn>", "\n\nUser:"],
+                        stream=True,
+                    ):
+                        token = chunk["choices"][0]["text"]
+                        yield token
+                finally:
+                    self._lock.release()
                 return
             except Exception as e:
                 logger.warning("Streaming LLM error: %s", e)

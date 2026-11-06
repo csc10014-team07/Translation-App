@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +80,7 @@ class ASRAdapter:
         self.device = device or settings.effective_device()
         self.model_id = settings.PHOASR_MODEL_ID
         self._pipe = None
+        self._lock = threading.Lock()
 
     def load(self) -> None:
         """Load PhoASR pipeline onto target device."""
@@ -106,7 +108,8 @@ class ASRAdapter:
             "task": "transcribe",
             "language": "vi",
         }
-        res = self._pipe(data, generate_kwargs=generate_kwargs)
+        with self._lock:
+            res = self._pipe(data, generate_kwargs=generate_kwargs)
         text = res.get("text", "").strip()
 
         return {
