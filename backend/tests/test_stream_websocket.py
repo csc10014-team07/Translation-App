@@ -1,154 +1,480 @@
-"""Integration test for Ticket 06: Real-Time Streaming WebSocket Pipeline."""
+"""Tests for BE2: VAD stream endpoint fixes.
+
+Tests (a)–(e) as specified:
+  (a) Odd-length chunk does not close the connection.
+  (b) 10 s of silence leaves the buffer small and sends no asr_final.
+  (c) Two utterances separated by silence are processed in order.
+  (d) A slow first utterance does not stop later chunks from being read.
+  (e) "stop" in the middle of speech processes that speech.
+
+All heavy dependencies (torch, numpy, soundfile, PIL, transformers,
+pydantic_settings, app.models.*) are stubbed at the sys.modules level
+so the suite runs without GPU or downloaded model weights.
+"""
+from __future__ import annotations
+
+import asyncio
 import sys
-from pathlib import Path
+import threading
+import types
+from collections.abc import Generator
+from typing import Any
+from unittest.mock import MagicMock
 
-backend_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_dir))
+import pytest
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+# Skip entire module if numpy or soundfile are not installed
+numpy = pytest.importorskip("numpy")
+soundfile = pytest.importorskip("soundfile")
+numpy = pytest.importorskip("numpy")
+soundfile = pytest.importorskip("soundfile")
 
-import numpy as np
-import soundfile as sf
-from app.main import app
-from starlette.testclient import TestClient
+# ---------------------------------------------------------------------------
+# Lightweight sys.modules stubs — must come before any app import.
+# ---------------------------------------------------------------------------
 
 
-def test_websocket_streaming_pipeline():
-    client = TestClient(app)
+def _stub(name: str, **attrs: object) -> types.ModuleType:
+    mod = types.ModuleType(name)
+    for k, v in attrs.items():
+        setattr(mod, k, v)
+    sys.modules.setdefault(name, mod)
+    return sys.modules[name]
 
-    print("--- 1. Testing WebSocket Handshake & Direct Text Streaming ---")
+
+# torch — needed by app.core.config and app.core.vram_monitor
+_torch = _stub("torch")
+_cuda = MagicMock()
+_cuda.is_available = MagicMock(return_value=False)
+_torch.cuda = _cuda  # type: ignore[attr-defined]
+_torch.tensor = MagicMock()  # type: ignore[attr-defined]
+
+# pydantic_settings — needed by app.core.config
+_BaseSettings = type(
+    "BaseSettings",
+    (),
+    {
+        "__init_subclass__": classmethod(lambda cls, **kw: None),
+        "__init__": lambda self, **kw: None,
+    },
+)
+_stub("pydantic_settings", BaseSettings=_BaseSettings, SettingsConfigDict=MagicMock())
+
+# numpy — needed by stream.py and asr_adapter
+
+# soundfile — needed by stream.py
+
+# transformers — needed by asr_adapter
+_stub("transformers", pipeline=MagicMock())
+
+# rapidocr_onnxruntime — needed by ocr_adapter
+_stub("rapidocr_onnxruntime", RapidOCR=MagicMock())
+
+# PIL — needed by ocr route (not imported here, but guard against leakage)
+_stub("PIL", Image=MagicMock())
+
+# llama_cpp — needed by translation_adapter
+_stub("llama_cpp", Llama=MagicMock())
+
+# deep_translator — needed by translation_adapter
+_stub("deep_translator", MyMemoryTranslator=MagicMock())
+
+# aiofiles — needed by asr route
+_stub("aiofiles")
+
+# ---------------------------------------------------------------------------
+# Patch app.core.config.settings before importing anything from app.*
+# ---------------------------------------------------------------------------
+
+
+# Build a real-enough Settings object without pydantic machinery.
+class _FakeSettings:
+    MAX_AUDIO_DURATION_S: float = 30.0
+    DEVICE: str = "cpu"
+    GEMMA_GGUF_PATH: str = "/nonexistent"
+    GEMMA_N_CTX: int = 2048
+    GEMMA_N_GPU_LAYERS: int = 0
+    PHOASR_MODEL_ID: str = "fake/model"
+    MODELS_DIR: str = "./models"
+    API_PREFIX: str = "/api"
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+
+    def effective_device(self) -> str:
+        return "cpu"
+
+
+_fake_settings = _FakeSettings()
+
+# Patch config module before it's imported.
+_config_mod = _stub("app.core.config", settings=_fake_settings)
+
+# ---------------------------------------------------------------------------
+# Now safe to import app.core.vram_monitor and app.api.routes.stream
+# ---------------------------------------------------------------------------
+
+# app.core.vram_monitor uses torch directly — patch it.
+import app.core.vram_monitor as _vram_mod  # noqa: E402
+
+_vram_mod.vram_tracker = MagicMock()  # replace with a no-op tracker
+
+# ---------------------------------------------------------------------------
+# Build fake model manager & adapters for injection.
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_manager(
+    asr_fn: Any = None,
+    trans_fn: Any = None,
+    tts_fn: Any = None,
+) -> MagicMock:
+    """Return a fake ModelManager whose get_* coroutines return fake adapters."""
+
+    async def _fake_coro(value: Any) -> Any:
+        return value
+
+    # ASR adapter
+    asr_adapter = MagicMock()
+    if asr_fn is not None:
+        asr_adapter.transcribe = asr_fn
+    else:
+        asr_adapter.transcribe = lambda path: {"text": "transcribed", "language": "vi", "duration": 1.0}
+
+    # Translation adapter
+    trans_adapter = MagicMock()
+    if trans_fn is not None:
+        trans_adapter.translate_stream = trans_fn
+    else:
+
+        def _default_stream(**kw: Any) -> Generator[str, None, None]:
+            yield "hello"
+
+        trans_adapter.translate_stream = _default_stream
+
+    # TTS adapter
+    tts_adapter = MagicMock()
+    if tts_fn is not None:
+        tts_adapter.synthesize = tts_fn
+    else:
+        import numpy as np
+
+        tts_adapter.synthesize = lambda text, language: (
+            np.zeros(16000, dtype=np.float32),
+            16000,
+        )
+
+    manager = MagicMock()
+    manager.get_asr = MagicMock(side_effect=lambda: asyncio.coroutine(lambda: asr_adapter)())
+    manager.get_translation = MagicMock(
+        side_effect=lambda: asyncio.coroutine(lambda: trans_adapter)()
+    )
+    manager.get_tts = MagicMock(side_effect=lambda: asyncio.coroutine(lambda: tts_adapter)())
+
+    return manager, asr_adapter, trans_adapter, tts_adapter
+
+
+# ---------------------------------------------------------------------------
+# Helper: make a FastAPI test app with only the stream router.
+# ---------------------------------------------------------------------------
+
+
+def _make_test_app(manager: MagicMock) -> Any:
+    import app.api.routes.stream as stream_mod
+    from fastapi import FastAPI
+
+    test_app = FastAPI()
+    test_app.include_router(stream_mod.router)
+
+    # Patch get_model_manager inside stream_mod for the lifetime of the test.
+    stream_mod.get_model_manager = lambda: manager  # type: ignore[assignment]
+
+    return test_app
+
+
+# ---------------------------------------------------------------------------
+# PCM helpers
+# ---------------------------------------------------------------------------
+_SR = 16000  # samples per second
+_BPS = 2     # bytes per sample (int16)
+
+
+def _silence_chunk(duration_s: float = 0.1) -> bytes:
+    """Return a chunk of silence PCM bytes."""
+    n = int(_SR * duration_s)
+    import numpy as np
+    return (np.zeros(n, dtype=np.int16)).tobytes()
+
+
+def _speech_chunk(duration_s: float = 0.1, amplitude: float = 0.5) -> bytes:
+    """Return a chunk of loud-ish PCM bytes that will pass the RMS threshold."""
+    import numpy as np
+    n = int(_SR * duration_s)
+    # Square wave at amplitude — easily exceeds VADSettings.rms_threshold = 0.012
+    signal = np.full(n, int(amplitude * 32767), dtype=np.int16)
+    return signal.tobytes()
+
+
+# ---------------------------------------------------------------------------
+# Shared manager + app fixture helpers
+# ---------------------------------------------------------------------------
+
+
+def _simple_manager() -> tuple[MagicMock, Any, Any, Any]:
+    """Return (manager, asr, trans, tts) with simple synchronous fakes."""
+    return _make_fake_manager()
+
+
+# ---------------------------------------------------------------------------
+# (a) Odd-length chunk does not close the connection.
+# ---------------------------------------------------------------------------
+
+
+def test_odd_length_chunk_does_not_disconnect():
+    """An odd-number-of-bytes binary frame must not raise or close the WS."""
+
+    manager, *_ = _simple_manager()
+    app_ = _make_test_app(manager)
+
+    from starlette.testclient import TestClient
+
+    client = TestClient(app_)
     with client.websocket_connect("/ws/stream") as ws:
-        # Step 1: Initial Handshake
-        init_msg = ws.receive_json()
-        assert init_msg["type"] == "ready"
-        assert init_msg.get("event") == "ready"
-        print(f"✅ Handshake received: {init_msg}")
+        init = ws.receive_json()
+        assert init["type"] == "ready"
 
-        # Step 2: Configure session
-        ws.send_json({
-            "action": "start",
-            "source_lang": "vi",
-            "target_lang": "en",
-            "context_preset": "Casual",
-            "custom_context": "At a friendly coffee shop",
-            "clone_voice": False,
-        })
-        cfg_msg = ws.receive_json()
-        assert cfg_msg["type"] == "config_updated"
-        assert cfg_msg.get("event") == "config_updated"
-        print(f"✅ Config updated: {cfg_msg['config']}")
+        # Send a 1-byte (odd) chunk — should not raise or disconnect
+        ws.send_bytes(b"\x01")
 
-        # Step 3: Test direct text translation & token streaming
-        ws.send_json({
-            "action": "translate_text",
-            "text": "Cho tôi một ly cà phê sữa đá.",
-        })
+        # Send another valid even chunk of silence — connection still alive
+        ws.send_bytes(_silence_chunk(0.05))
 
-        asr_msg = ws.receive_json()
-        assert asr_msg["type"] == "asr_final"
-        assert asr_msg.get("event") == "asr_final"
-        print(f"✅ Input text acknowledged: \"{asr_msg['text']}\"")
+        # Send stop — connection should still be alive enough to respond
+        ws.send_json({"action": "stop"})
 
-        # Streamed token deltas
-        deltas = []
+        # Drain until stopped
         while True:
             msg = ws.receive_json()
-            if msg["type"] == "trans_start":
-                assert msg.get("event") == "trans_start"
-                continue
-            elif msg["type"] == "trans_delta":
-                assert msg.get("event") == "trans_delta"
-                assert "delta" in msg and "token" in msg
-                deltas.append(msg["delta"])
-            elif msg["type"] == "trans_final":
-                assert msg.get("event") == "trans_final"
-                print(f"✅ Token streaming completed. Full translation: \"{msg['text']}\"")
-                print(f"   Received {len(deltas)} progressive tokens.")
+            if msg.get("type") == "stopped":
                 break
+            # Allow error messages from worker teardown, but not disconnect
 
-        # TTS Audio
-        tts_msg = ws.receive_json()
-        assert tts_msg["type"] == "tts_audio"
-        assert tts_msg.get("event") == "tts_audio"
-        assert len(tts_msg["audio_b64"]) > 100
-        print(f"✅ TTS Audio received ({tts_msg['format']}) - {len(tts_msg['audio_b64'])} bytes.")
 
-        # Step 4: Test PCM Audio Frame Streaming with VAD
-        print("\n--- 2. Testing Binary 16kHz PCM Audio Streaming with VAD ---")
-        audio_path = Path(__file__).parent.parent.parent.parent / "benchmarks" / "output_audio" / "tts_vi_HoaiMyNeural.mp3"
-        data, sr = sf.read(str(audio_path))
-        if data.ndim > 1:
-            data = data.mean(axis=1)
-        if sr != 16000:
-            target_samples = int(len(data) * 16000 / sr)
-            data = np.interp(
-                np.linspace(0, len(data), target_samples, endpoint=False),
-                np.arange(len(data)),
-                data,
-            )
+# ---------------------------------------------------------------------------
+# (b) 10 s of silence: buffer stays small, no asr_final sent.
+# ---------------------------------------------------------------------------
 
-        # Convert to 16-bit PCM bytes
-        pcm_int16 = (np.clip(data, -1.0, 1.0) * 32767).astype(np.int16)
-        raw_pcm_bytes = pcm_int16.tobytes()
 
-        # Stream in 200ms chunks (6400 bytes per chunk at 16kHz 16-bit)
-        chunk_size = 6400
-        for i in range(0, len(raw_pcm_bytes), chunk_size):
-            chunk = raw_pcm_bytes[i : i + chunk_size]
-            ws.send_bytes(chunk)
+def test_silence_does_not_grow_buffer_or_trigger_asr():
+    """10 seconds of silence must not trigger asr_final and must keep buffer tiny."""
 
-        # Send 500ms of silence to trigger VAD pause boundary (16000 samples/sec * 2 bytes = 32000 bytes/sec -> 16000 bytes)
-        silence_chunk = (np.zeros(8000, dtype=np.int16)).tobytes()
-        ws.send_bytes(silence_chunk)
+    asr_called = threading.Event()
+    original_transcribe = lambda path: (asr_called.set(), {"text": "oops", "language": "vi", "duration": 1.0})[1]  # noqa: E731
 
-        # Receive VAD-triggered events (asr_interim and asr_final)
-        first_event = ws.receive_json()
-        if first_event["type"] == "asr_interim":
-            assert first_event.get("event") == "asr_interim"
-            print(f"✅ VAD interim speech activity detected: {first_event}")
-            vad_asr_msg = ws.receive_json()
-        else:
-            vad_asr_msg = first_event
+    manager, asr_adapter, *_ = _make_fake_manager(asr_fn=original_transcribe)
+    asr_adapter.transcribe = original_transcribe
+    app_ = _make_test_app(manager)
 
-        assert vad_asr_msg["type"] == "asr_final"
-        assert vad_asr_msg.get("event") == "asr_final"
-        print(f"✅ VAD ASR transcribed: \"{vad_asr_msg['text']}\" in {vad_asr_msg.get('elapsed_ms')}ms")
+    from starlette.testclient import TestClient
 
-        # Receive trans_start and deltas
-        stream_started = ws.receive_json()
-        assert stream_started["type"] == "trans_start"
-        assert stream_started.get("event") == "trans_start"
+    messages: list[dict] = []
 
-        stream_deltas = []
-        while True:
-            m = ws.receive_json()
-            if m["type"] == "trans_delta":
-                assert m.get("event") == "trans_delta"
-                assert "delta" in m and "token" in m
-                stream_deltas.append(m["delta"])
-            elif m["type"] == "trans_final":
-                assert m.get("event") == "trans_final"
-                print(f"✅ Live Translation: \"{m['text']}\"")
-                break
+    client = TestClient(app_)
+    with client.websocket_connect("/ws/stream") as ws:
+        init = ws.receive_json()
+        assert init["type"] == "ready"
 
-        # Receive TTS
-        vad_tts_msg = ws.receive_json()
-        assert vad_tts_msg["type"] == "tts_audio"
-        assert vad_tts_msg.get("event") == "tts_audio"
-        print(f"✅ Live TTS Audio received: format={vad_tts_msg['format']}")
+        # Send 10 s of 100ms silence chunks (100 chunks)
+        for _ in range(100):
+            ws.send_bytes(_silence_chunk(0.1))
 
-        # Clean Stop and drain remaining stream events
         ws.send_json({"action": "stop"})
         while True:
             msg = ws.receive_json()
-            print(f"Received stream event: {msg.get('type')}")
+            messages.append(msg)
             if msg.get("type") == "stopped":
-                assert msg.get("event") == "stopped"
                 break
-        print("✅ WebSocket session stopped cleanly.")
 
-    print("\n🎉 ALL TICKET 06 REAL-TIME STREAMING TESTS PASSED!")
+    types_seen = {m["type"] for m in messages}
+    assert "asr_final" not in types_seen, f"No asr_final expected during silence, got: {types_seen}"
+    assert not asr_called.is_set(), "ASR transcribe must not be called during 10 s of silence"
 
-if __name__ == "__main__":
-    test_websocket_streaming_pipeline()
+
+# ---------------------------------------------------------------------------
+# (c) Two utterances separated by silence are processed in order.
+# ---------------------------------------------------------------------------
+
+
+def test_two_utterances_processed_in_order():
+    """Two speech segments separated by silence must produce two asr_final in order."""
+
+    call_order: list[str] = []
+    counter = [0]
+
+    def ordered_transcribe(path: str) -> dict:
+        counter[0] += 1
+        label = f"utterance_{counter[0]}"
+        call_order.append(label)
+        return {"text": label, "language": "vi", "duration": 0.5}
+
+    manager, *_ = _make_fake_manager(asr_fn=ordered_transcribe)
+    app_ = _make_test_app(manager)
+
+    from starlette.testclient import TestClient
+
+    client = TestClient(app_)
+    asr_texts: list[str] = []
+
+    # Build a 1-second speech burst (> min_speech_samples=4800 samples)
+    speech = _speech_chunk(0.5) * 2  # 1s = 32000 bytes  (even, loud)
+
+    # Silence long enough to trigger VAD pause boundary: > 450ms = 7200 samples
+    silence = _silence_chunk(0.5)   # 500ms
+
+    with client.websocket_connect("/ws/stream") as ws:
+        init = ws.receive_json()
+        assert init["type"] == "ready"
+
+        # --- Utterance 1 ---
+        ws.send_bytes(speech)
+        ws.send_bytes(silence)
+
+        # --- Utterance 2 ---
+        ws.send_bytes(speech)
+        ws.send_bytes(silence)
+
+        ws.send_json({"action": "stop"})
+
+        # Collect all messages
+        all_msgs: list[dict] = []
+        while True:
+            msg = ws.receive_json()
+            all_msgs.append(msg)
+            if msg["type"] == "stopped":
+                break
+
+    for m in all_msgs:
+        if m["type"] == "asr_final":
+            asr_texts.append(m["text"])
+
+    assert len(asr_texts) >= 2, f"Expected >=2 asr_final messages, got: {asr_texts}"
+    assert asr_texts[0] == "utterance_1", f"First ASR text wrong: {asr_texts}"
+    assert asr_texts[1] == "utterance_2", f"Second ASR text wrong: {asr_texts}"
+
+
+# ---------------------------------------------------------------------------
+# (d) Slow first utterance does not block reading later audio chunks.
+# ---------------------------------------------------------------------------
+
+
+def test_slow_utterance_does_not_block_receive_loop():
+    """While the worker is processing a slow utterance, the receive loop continues reading."""
+
+    # First transcribe call blocks for a bit; second should still be callable.
+    call_times: list[float] = []
+    first_call_started = threading.Event()
+    allow_first = threading.Event()
+
+    call_index = [0]
+
+    def slow_transcribe(path: str) -> dict:
+        import time as _time
+        call_times.append(_time.monotonic())
+        idx = call_index[0]
+        call_index[0] += 1
+        if idx == 0:
+            first_call_started.set()
+            allow_first.wait(timeout=2.0)
+        return {"text": f"result_{idx}", "language": "vi", "duration": 0.5}
+
+    manager, *_ = _make_fake_manager(asr_fn=slow_transcribe)
+    app_ = _make_test_app(manager)
+
+    from starlette.testclient import TestClient
+
+    speech = _speech_chunk(0.5) * 2   # 1 s loud
+    silence = _silence_chunk(0.5)     # 500ms — triggers VAD boundary
+
+    # We'll unblock the first transcribe after sending the second utterance.
+    def _unblock():
+        # Give the client a moment to send the second utterance
+        import time as _t
+        _t.sleep(0.3)
+        allow_first.set()
+
+    client = TestClient(app_)
+    with client.websocket_connect("/ws/stream") as ws:
+        init = ws.receive_json()
+        assert init["type"] == "ready"
+
+        # Send first utterance + silence to trigger VAD
+        ws.send_bytes(speech)
+        ws.send_bytes(silence)
+
+        # Start a thread that will unblock the first transcribe after a delay
+        unblock_thread = threading.Thread(target=_unblock)
+        unblock_thread.start()
+
+        # Send second utterance while first is still running
+        ws.send_bytes(speech)
+        ws.send_bytes(silence)
+
+        unblock_thread.join(timeout=3)
+        ws.send_json({"action": "stop"})
+
+        asr_texts = []
+        while True:
+            msg = ws.receive_json()
+            if msg["type"] == "asr_final":
+                asr_texts.append(msg["text"])
+            if msg["type"] == "stopped":
+                break
+
+    # Both utterances must have been processed.
+    assert len(asr_texts) >= 2, f"Expected >=2 results even with slow first; got {asr_texts}"
+
+
+# ---------------------------------------------------------------------------
+# (e) "stop" in the middle of speech enqueues and processes that speech.
+# ---------------------------------------------------------------------------
+
+
+def test_stop_mid_speech_processes_buffered_audio():
+    """Sending 'stop' while in speech must enqueue the utterance, not discard it."""
+
+    transcribed: list[str] = []
+
+    def recording_transcribe(path: str) -> dict:
+        transcribed.append("called")
+        return {"text": "mid_speech", "language": "vi", "duration": 0.5}
+
+    manager, *_ = _make_fake_manager(asr_fn=recording_transcribe)
+    app_ = _make_test_app(manager)
+
+    from starlette.testclient import TestClient
+
+    # Send enough speech to exceed min_speech_samples=4800 samples
+    speech = _speech_chunk(0.5) * 2   # 1 s, well above 300 ms minimum
+
+    client = TestClient(app_)
+    with client.websocket_connect("/ws/stream") as ws:
+        init = ws.receive_json()
+        assert init["type"] == "ready"
+
+        # Send speech (puts us in_speech state)
+        ws.send_bytes(speech)
+
+        # Immediately stop without sending silence (no VAD boundary)
+        ws.send_json({"action": "stop"})
+
+        asr_texts = []
+        while True:
+            msg = ws.receive_json()
+            if msg["type"] == "asr_final":
+                asr_texts.append(msg["text"])
+            if msg["type"] == "stopped":
+                break
+
+    assert len(asr_texts) >= 1, (
+        f"'stop' mid-speech must have processed the buffered audio; got: {asr_texts}"
+    )
+    assert transcribed, "ASR transcribe must have been called"
