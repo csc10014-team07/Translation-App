@@ -71,6 +71,20 @@ class ModelManager:
             self._tts = TTSAdapter()
         return self._tts
 
+    def get_status(self) -> dict:
+        """Report which models are currently loaded (used by GET /api/metrics)."""
+        return {
+            "device": self.device,
+            "started": self._is_started,
+            "models_loaded": {
+                "asr": self._asr is not None and self._asr._pipe is not None,
+                "translation": self._translation is not None
+                and self._translation._llm is not None,
+                "tts_pocket": self._tts is not None
+                and self._tts._pocket_model is not None,
+            },
+        }
+
 
 _manager_instance: ModelManager | None = None
 
