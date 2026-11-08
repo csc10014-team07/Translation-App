@@ -134,8 +134,9 @@ async def synthesise_speech(
         elapsed_ms = (time.monotonic() - t0) * 1000
         vram_tracker.record_warm_inference("tts", elapsed_ms)
 
-        audio_array, sample_rate = tts_result[0], tts_result[1]
-        engine_used = getattr(tts_result, "engine", "edge_tts")
+        audio_array = tts_result.audio
+        sample_rate = tts_result.sample_rate
+        engine_used = tts_result.engine
 
         # ── Encode as base64 WAV ───────────────────────────────────────────
         audio_b64 = _audio_to_wav_base64(audio_array, sample_rate)

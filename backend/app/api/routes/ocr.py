@@ -57,12 +57,12 @@ async def ocr_image(
     chunks: list[bytes] = []
     total = 0
     while chunk := await image.read(65_536):
-        total += len(chunk)
-        if total > _MAX_IMAGE_SIZE_BYTES:
+        if total + len(chunk) > _MAX_IMAGE_SIZE_BYTES:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail="Image file exceeds 20 MB limit.",
             )
+        total += len(chunk)
         chunks.append(chunk)
     image_bytes = b"".join(chunks)
 
@@ -134,7 +134,7 @@ async def ocr_image(
 
     return OCRResponse(
         extracted_text=extracted_text,
-        detected_language=detected_lang,
+        detected_language=detected_lang or "en",
         target_language=resolved_target,
         translated_text=translated_text,
         boxes=boxes,

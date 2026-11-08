@@ -52,12 +52,12 @@ async def transcribe_audio(
     chunks: list[bytes] = []
     total = 0
     while chunk := await audio.read(65_536):
-        total += len(chunk)
-        if total > _MAX_AUDIO_SIZE_BYTES:
+        if total + len(chunk) > _MAX_AUDIO_SIZE_BYTES:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail="Audio file exceeds 100 MB limit.",
             )
+        total += len(chunk)
         chunks.append(chunk)
     raw_bytes = b"".join(chunks)
     if len(raw_bytes) < 100:
