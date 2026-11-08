@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     # ── Audio constraints ──────────────────────────────────────────────────
     MAX_AUDIO_DURATION_S: float = 30.0
 
+    # ── Online fallback ────────────────────────────────────────────────────
+    ALLOW_ONLINE_FALLBACK: bool = False
+
     # ── Server options ─────────────────────────────────────────────────────
     API_PREFIX: str = "/api"
     HOST: str = "0.0.0.0"

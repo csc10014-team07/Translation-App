@@ -66,6 +66,9 @@ async def translate_text(
 
     except HTTPException:
         raise
+    except RuntimeError as exc:
+        logger.warning("Translation model not loaded or inference failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Translation service unavailable.") from exc
     except Exception as exc:
         logger.exception("Translation failed")
         raise HTTPException(status_code=500, detail="Translation failed. See server logs.") from exc

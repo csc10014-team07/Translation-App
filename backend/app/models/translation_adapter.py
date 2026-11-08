@@ -1,10 +1,8 @@
-"""Translation Adapter wrapping TranslateGemma 4B GGUF with context and multi-tier fallbacks."""
+"""Translation Adapter wrapping TranslateGemma 4B GGUF with context."""
 from __future__ import annotations
 
-import json
 import logging
 import threading
-import urllib.request
 from collections.abc import Generator
 from pathlib import Path
 
@@ -32,17 +30,6 @@ LANGUAGE_NAMES = {
     "fr": "French", "french": "French",
     "de": "German", "german": "German",
     "es": "Spanish", "spanish": "Spanish",
-}
-
-MY_MEMORY_MAP = {
-    "vi": "vi-VN", "vietnamese": "vi-VN",
-    "en": "en-US", "english": "en-US",
-    "ja": "ja-JP", "japanese": "ja-JP",
-    "zh": "zh-CN", "chinese": "zh-CN",
-    "ko": "ko-KR", "korean": "ko-KR",
-    "fr": "fr-FR", "french": "fr-FR",
-    "de": "de-DE", "german": "de-DE",
-    "es": "es-ES", "spanish": "es-ES",
 }
 
 
@@ -143,25 +130,6 @@ class TranslationAdapter:
             f"<start_of_turn>model\n"
         )
 
-    def _query_ollama(self, prompt: str) -> str | None:
-        try:
-            payload = json.dumps({
-                "model": "gemma2:2b",
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.3},
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                "http://localhost:11434/api/generate",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            with urllib.request.urlopen(req, timeout=2.0) as resp:
-                res = json.loads(resp.read().decode("utf-8"))
-                return res.get("response", "").strip().strip('"')
-        except Exception:
-            return None
-
     def translate(
         self,
         text: str,
@@ -172,8 +140,15 @@ class TranslationAdapter:
         custom_context: str = "",
         return_details: bool = False,
     ) -> str | tuple[str, str]:
-        """Translate text with context awareness and multi-tier fallbacks."""
+        """Translate text with context awareness using local TranslateGemma model."""
+        from app.core.config import settings
+
         self.load()
+        if self._llm is None:
+            if settings.ALLOW_ONLINE_FALLBACK:
+                logger.warning("TranslateGemma model not loaded, but online fallback is disabled")
+            raise RuntimeError("TranslateGemma model is not loaded. Please verify GEMMA_GGUF_PATH.")
+
         prompt = self.build_prompt(
             text=text,
             source_lang=source_language,
@@ -183,41 +158,24 @@ class TranslationAdapter:
             custom_context=custom_context,
         )
 
-        # Tier 1: TranslateGemma 4B GGUF
-        if self._llm is not None:
-            try:
-                with self._lock:
-                    output = self._llm(
-                        prompt,
-                        max_tokens=512,
-                        temperature=0.3,
-                        top_p=0.9,
-                        stop=["<end_of_turn>", "\n\nUser:"],
-                    )
-                ans = output["choices"][0]["text"].strip().strip('"')
-                if ans:
-                    return (ans, "translategemma-4b") if return_details else ans
-            except Exception as e:
-                logger.warning("Gemma inference error: %s", e)
-
-        # Tier 2: Ollama probe
-        ollama_ans = self._query_ollama(prompt)
-        if ollama_ans:
-            return (ollama_ans, "ollama:gemma2") if return_details else ollama_ans
-
-        # Tier 3: Neural Translator fallback (guarantees real translation)
         try:
-            from deep_translator import MyMemoryTranslator
-            src_c = MY_MEMORY_MAP.get(source_language.lower(), "vi-VN")
-            tgt_c = MY_MEMORY_MAP.get(target_language.lower(), "en-US")
-            res = MyMemoryTranslator(source=src_c, target=tgt_c).translate(text)
-            if res:
-                return (res, "mymemory") if return_details else res
+            with self._lock:
+                output = self._llm(
+                    prompt,
+                    max_tokens=512,
+                    temperature=0.3,
+                    top_p=0.9,
+                    stop=["<end_of_turn>", "\n\nUser:"],
+                )
+            ans = output["choices"][0]["text"].strip().strip('"')
+            if ans:
+                return (ans, "translategemma-4b") if return_details else ans
+            raise RuntimeError("TranslateGemma returned empty response")
         except Exception as e:
-            logger.warning("MyMemory fallback error: %s", e)
-
-        fallback = f"[{target_language}] {text}"
-        return (fallback, "fallback:degraded") if return_details else fallback
+            logger.warning("Gemma inference error: %s", e)
+            if settings.ALLOW_ONLINE_FALLBACK:
+                logger.warning("Online fallback is disabled (ALLOW_ONLINE_FALLBACK=false)")
+            raise RuntimeError(f"Translation failed: {e}") from e
 
     def translate_with_engine(
         self,
