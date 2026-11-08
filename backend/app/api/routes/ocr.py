@@ -35,6 +35,7 @@ _MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 async def ocr_image(
     image: UploadFile = File(...),  # noqa: B008
     target_language: str | None = Form(None),
+    source_language: str | None = Form(None),
     context_preset: str = Form("General"),
     custom_context: str = Form(""),
     manager: ModelManager = Depends(dep_model_manager),  # noqa: B008
@@ -101,6 +102,9 @@ async def ocr_image(
     if not resolved_target:
         # Auto-resolve target language based on detected source language
         resolved_target = "en" if detected_lang.lower() == "vi" else "vi"
+    
+    # Use explicit source_language if provided, otherwise use detected language
+    resolved_source = (source_language or "").strip() or detected_lang
 
     translated_text = ""
     if extracted_text.strip():
@@ -110,7 +114,7 @@ async def ocr_image(
                 None,
                 lambda: translation.translate(
                     text=extracted_text,
-                    source_language=detected_lang,
+                    source_language=resolved_source,
                     target_language=resolved_target,
                     context_preset=context_preset,
                     custom_context=custom_context,
@@ -118,8 +122,11 @@ async def ocr_image(
             )
             translated_text = raw_res[0] if isinstance(raw_res, tuple) else raw_res
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Stage 2 translation failed, falling back to empty translation: %s", exc)
-            translated_text = f"[{resolved_target}] {extracted_text}"
+            logger.warning("Stage 2 translation failed: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Translation service unavailable: {exc}",
+            ) from exc
 
     # Determine backward-compatible vietnamese_text for mobile client
     if detected_lang.lower() == "vi":
