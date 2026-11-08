@@ -1,7 +1,6 @@
 """TTS Adapter providing Hybrid Voice-Cloning and Natural Neural Speech."""
 from __future__ import annotations
 
-import asyncio
 import logging
 import tempfile
 import threading
@@ -148,10 +147,10 @@ class TTSAdapter:
         supported = set(EDGE_VOICES_FEMALE.keys()) | set(EDGE_VOICES_MALE.keys())
         return lang_key in supported
 
-    def _synthesize_edge_tts(
+    async def _synthesize_edge_tts(
         self, text: str, language: str, voice_style: str | None = None
     ) -> TTSResult:
-        """Synthesize using Edge-TTS asynchronously with timeout."""
+        """Synthesize using Edge-TTS with async/await."""
         if not settings.EDGE_TTS_ENABLED:
             raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
         
@@ -164,31 +163,27 @@ class TTSAdapter:
 
         voice, voice_note = self._resolve_edge_voice(language, voice_style)
 
-        async def _run() -> tuple[np.ndarray, int]:
-            connector = aiohttp.TCPConnector(limit=10, force_close=True, limit_per_host=5)
-            
-            comm = edge_tts.Communicate(
-                text, 
-                voice, 
-                connector=connector,
-                connect_timeout=10,
-                receive_timeout=20
-            )
-            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, mode='wb') as tmp:
-                tmp_path = tmp.name
-            try:
-                await comm.save(tmp_path)
-                data, sr = sf.read(tmp_path)
-                if data.ndim > 1:
-                    data = data.mean(axis=1)
-                return data.astype(np.float32), sr
-            finally:
-                Path(tmp_path).unlink(missing_ok=True)
-
-        audio_arr, sr = asyncio.run(_run())
+        connector = aiohttp.TCPConnector(limit=10, force_close=True, limit_per_host=5)
+        comm = edge_tts.Communicate(
+            text,
+            voice,
+            connector=connector,
+            connect_timeout=10,
+            receive_timeout=20,
+        )
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, mode='wb') as tmp:
+            tmp_path = tmp.name
+        try:
+            await comm.save(tmp_path)
+            data, sr = sf.read(tmp_path)
+            if data.ndim > 1:
+                data = data.mean(axis=1)
+            audio_arr = data.astype(np.float32)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
         return TTSResult(audio_arr, sr, engine="edge_tts", voice_note=voice_note)
 
-    def synthesize(
+    async def synthesize(
         self,
         text: str,
         language: str = "English",
@@ -224,7 +219,7 @@ class TTSAdapter:
                     raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
                 if not self._is_edge_language_supported(language):
                     raise ValueError(f"Unknown Edge-TTS language: {language}")
-                return self._synthesize_edge_tts(text, language, voice_style)
+                return await self._synthesize_edge_tts(text, language, voice_style)
         
         # Vietnamese always uses Edge-TTS
         if is_vietnamese:
@@ -232,7 +227,7 @@ class TTSAdapter:
                 raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
             if not self._is_edge_language_supported(language):
                 raise ValueError(f"Unknown Edge-TTS language: {language}")
-            return self._synthesize_edge_tts(text, language, voice_style)
+            return await self._synthesize_edge_tts(text, language, voice_style)
         
         # Pocket TTS languages: use Pocket TTS if reference audio is provided
         if lang_lower in POCKET_TTS_LANGUAGES:
@@ -246,7 +241,7 @@ class TTSAdapter:
             raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
         if not self._is_edge_language_supported(language):
             raise ValueError(f"Unknown Edge-TTS language: {language}")
-        return self._synthesize_edge_tts(text, language, voice_style)
+        return await self._synthesize_edge_tts(text, language, voice_style)
 
     def _synthesize_pocket_tts(
         self,

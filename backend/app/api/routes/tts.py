@@ -1,7 +1,6 @@
 """TTS route — POST /api/tts."""
 from __future__ import annotations
 
-import asyncio
 import base64
 import io
 import logging
@@ -123,14 +122,11 @@ async def synthesise_speech(
         tts = await manager.get_tts()
         t0 = time.monotonic()
         try:
-            tts_result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: tts.synthesize(
-                    text=effective_text,
-                    language=effective_language,
-                    reference_audio_path=ref_audio_path,
-                    voice_style=voice_style,
-                ),
+            tts_result = await tts.synthesize(
+                text=effective_text,
+                language=effective_language,
+                reference_audio_path=ref_audio_path,
+                voice_style=voice_style,
             )
         except ValueError as exc:
             # Language or engine not supported
