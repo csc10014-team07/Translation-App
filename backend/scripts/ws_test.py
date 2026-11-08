@@ -15,6 +15,7 @@ connection stays open. Exit code 1 if a check fails. Paste the whole output when
 import argparse
 import asyncio
 import json
+import re
 import sys
 import time
 import wave
@@ -47,6 +48,8 @@ async def main():
     ap.add_argument("--odd", action="store_true", help="make the first chunk odd-length (tests byte alignment)")
     ap.add_argument("--silence-s", type=float, default=1.0, help="trailing silence so the VAD ends the utterance")
     ap.add_argument("--timeout", type=float, default=120.0)
+    ap.add_argument("--expect-no-speech", action="store_true",
+                    help="for silence-only files: expect NO asr_final and a clean 'stopped'")
     a = ap.parse_args()
 
     pcm = load_pcm(a.wav) + b"\x00" * int(a.silence_s * RATE * WIDTH)
@@ -108,15 +111,27 @@ async def main():
         return any((m.get("type") or m.get("event")) == name for m in events)
 
     asr = next((m.get("text") for m in reversed(events) if (m.get("type") or m.get("event")) == "asr_final"), "")
-    checks = [
-        ("ready event", has("ready")),
-        ("asr_final with text", bool(str(asr).strip())),
-        ("translation event", has("trans_final") or has("trans_delta")),
-        ("tts_audio event (optional)", has("tts_audio") or None),
-        ("no error events", not errors),
-        ("connection not dropped early", not closed),
-        ("stopped event", has("stopped")),
-    ]
+    trans = next((m.get("text") for m in reversed(events) if (m.get("type") or m.get("event")) == "trans_final"), "")
+    placeholder = bool(re.match(r"^\[[A-Za-z-]{2,8}\]\s", str(trans)))
+    if a.expect_no_speech:
+        checks = [
+            ("ready event", has("ready")),
+            ("no asr_final for silence", not str(asr).strip()),
+            ("no error events", not errors),
+            ("connection not dropped early", not closed),
+            ("stopped event", has("stopped")),
+        ]
+    else:
+        checks = [
+            ("ready event", has("ready")),
+            ("asr_final with text", bool(str(asr).strip())),
+            ("translation event", has("trans_final") or has("trans_delta")),
+            ("translation is real (not a '[xx] ...' placeholder)", bool(trans) and not placeholder),
+            ("tts_audio event (optional)", has("tts_audio") or None),
+            ("no error events", not errors),
+            ("connection not dropped early", not closed),
+            ("stopped event", has("stopped")),
+        ]
     print()
     bad = 0
     for name, ok in checks:
