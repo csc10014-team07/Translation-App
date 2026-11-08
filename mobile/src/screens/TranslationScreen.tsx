@@ -32,7 +32,6 @@ export default function TranslationScreen() {
     targetLanguage,
     translatedText,
     sourceLanguage,
-    referenceText,
     synthesizedAudioUri,
     isTranscribing,
     isOcrProcessing,
@@ -48,7 +47,6 @@ export default function TranslationScreen() {
     processImage,
     translate,
     setReferenceAudio,
-    setReferenceText,
     synthesize,
     startStreaming,
     stopStreaming,
@@ -238,9 +236,7 @@ export default function TranslationScreen() {
         targetLanguage={targetLanguage}
         isSynthesizing={isSynthesizing}
         synthesizedAudioUri={synthesizedAudioUri}
-        referenceText={referenceText}
         onRecordReference={setReferenceAudio}
-        onReferenceTextChange={setReferenceText}
         onSynthesize={synthesize}
       />
     </ScrollView>

@@ -20,10 +20,6 @@ class TTSRequest(BaseModel):
         default=None,
         description="Optional voice style or persona (e.g. 'male', 'female', 'vi-VN-NamMinhNeural').",
     )
-    reference_text: str | None = Field(
-        default=None,
-        description="Transcript of the reference audio clip for voice cloning.",
-    )
 
 
 class TTSResponse(BaseModel):

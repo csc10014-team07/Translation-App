@@ -17,9 +17,7 @@ interface Props {
   targetLanguage: string;
   isSynthesizing: boolean;
   synthesizedAudioUri: string | null;
-  referenceText: string;
   onRecordReference: (uri: string) => void;
-  onReferenceTextChange: (text: string) => void;
   onSynthesize: () => void;
 }
 
@@ -31,9 +29,7 @@ export default function VoiceCloningPanel({
   targetLanguage,
   isSynthesizing,
   synthesizedAudioUri,
-  referenceText,
   onRecordReference,
-  onReferenceTextChange,
   onSynthesize,
 }: Props) {
   const scheme = useColorScheme();
@@ -123,23 +119,6 @@ export default function VoiceCloningPanel({
           <VoiceRecorder
             onRecordingComplete={handleReferenceRecorded}
             disabled={isSynthesizing}
-          />
-
-          {/* Reference Text (Optional) */}
-          <Text style={[styles.sectionLabel, isDark && styles.textDark]}>
-            2. Reference text{' '}
-            <Text style={styles.hint}>(optional, improves cloning)</Text>
-          </Text>
-          <TextInput
-            style={[styles.textInput, isDark && styles.textInputDark]}
-            value={referenceText}
-            onChangeText={onReferenceTextChange}
-            placeholder="Type what you said in the reference recording..."
-            placeholderTextColor={isDark ? '#555' : '#bbb'}
-            multiline
-            numberOfLines={2}
-            textAlignVertical="top"
-            editable={!isSynthesizing}
           />
 
           {/* Synthesize Button */}

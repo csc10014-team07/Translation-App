@@ -74,6 +74,27 @@ async def transcribe_audio(
         async with aiofiles.open(tmp_path, "wb") as f:
             await f.write(raw_bytes)
 
+        # ── Check duration before transcribing ────────────────────────────────
+        from app.core.config import settings
+        from app.models.asr_adapter import load_audio_file
+
+        # Load audio to get duration (avoids wasted transcription if too long)
+        try:
+            audio_data, duration = await asyncio.get_event_loop().run_in_executor(
+                None, load_audio_file, tmp_path, 16000
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+
+        if duration > settings.MAX_AUDIO_DURATION_S:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Audio exceeds maximum duration of {settings.MAX_AUDIO_DURATION_S} seconds.",
+            )
+
         # ── Run ASR ────────────────────────────────────────────────────────
         asr = await manager.get_asr()
         t0 = time.monotonic()

@@ -240,6 +240,7 @@ web-build/
 .env*.local
 
 # Dữ liệu sinh ra khi chạy
+graphify-out/
 *.wav
 *.mp3
 *.m4a

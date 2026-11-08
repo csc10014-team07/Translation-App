@@ -95,6 +95,18 @@ def test_asr_endpoint():
         assert "elapsed_ms" in wav_data
         print(f"✅ PhoASR WAV transcription output: \"{wav_data['text']}\"")
 
+        # Test duration limit (422 for audio > 30s)
+        import numpy as np
+        long_audio = np.random.uniform(-0.1, 0.1, size=480000).astype(np.float32)  # ~30s at 16kHz
+        long_bytes = io.BytesIO()
+        import soundfile as sf
+        sf.write(long_bytes, long_audio, 16000, format="WAV")
+        long_bytes.seek(0)
+        long_wav = long_bytes.read()
+        resp_long = client.post("/api/asr", files={"audio": ("long.wav", long_wav, "audio/wav")})
+        assert resp_long.status_code == 422, f"Expected 422 for long audio, got {resp_long.status_code}"
+        print("✅ ASR duration limit enforced (422 for >30s audio)")
+
     print("\n🎉 ALL TICKET 03 TESTS PASSED!")
 
 if __name__ == "__main__":

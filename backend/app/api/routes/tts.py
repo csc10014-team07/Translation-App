@@ -24,6 +24,7 @@ router = APIRouter(prefix="/tts", tags=["TTS"])
 
 _VIETNAMESE_LANG_CODES = {"vi", "vietnamese", "vie"}
 _SUPPORTED_REF_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+_MAX_REF_AUDIO_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def _is_vietnamese(language: str) -> bool:
@@ -55,7 +56,6 @@ async def synthesise_speech(
     target_language: str | None = Form(default=None),
     voice_style: str | None = Form(default=None),
     reference_audio: UploadFile | None = None,
-    reference_text: str | None = Form(default=None),
     manager: ModelManager = Depends(dep_model_manager),  # noqa: B008
 ) -> TTSResponse:
     """Synthesise speech using Hybrid TTS (Pocket TTS voice cloning + Edge-TTS)."""
@@ -69,9 +69,11 @@ async def synthesise_speech(
                 language = body.get("language", language)
                 target_language = body.get("target_language", target_language)
                 voice_style = body.get("voice_style", voice_style)
-                reference_text = body.get("reference_text", reference_text)
         except Exception as err:  # noqa: BLE001
-            logger.debug("Failed to decode JSON payload: %s", err)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid JSON body",
+            ) from err
 
     # ── Validate text and language ─────────────────────────────────────────
     effective_text = (text or "").strip()
@@ -99,9 +101,21 @@ async def synthesise_speech(
                     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                     detail=f"Unsupported reference audio format '{ref_suffix}'. Allowed formats: {_SUPPORTED_REF_AUDIO_EXTENSIONS}",
                 )
+            # Read with size guard (20 MB cap)
+            ref_chunks: list[bytes] = []
+            ref_total = 0
+            while chunk := await reference_audio.read(65_536):
+                ref_total += len(chunk)
+                if ref_total > _MAX_REF_AUDIO_BYTES:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail="Reference audio exceeds 20 MB limit.",
+                    )
+                ref_chunks.append(chunk)
+            ref_bytes = b"".join(ref_chunks)
+
             with tempfile.NamedTemporaryFile(suffix=ref_suffix, delete=False) as tmp:
                 ref_audio_path = tmp.name
-            ref_bytes = await reference_audio.read()
             async with aiofiles.open(ref_audio_path, "wb") as f:
                 await f.write(ref_bytes)
 
@@ -114,7 +128,6 @@ async def synthesise_speech(
                 text=effective_text,
                 language=effective_language,
                 reference_audio_path=ref_audio_path,
-                reference_text=reference_text,
                 voice_style=voice_style,
             ),
         )

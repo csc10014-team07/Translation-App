@@ -190,7 +190,6 @@ export async function synthesizeSpeech(
   text: string,
   language: string,
   referenceAudioUri?: string,
-  referenceText?: string,
 ): Promise<TTSResponse> {
   const form = new FormData();
   form.append('text', text);
@@ -208,9 +207,6 @@ export async function synthesizeSpeech(
       mimeType,
       fileName,
     );
-  }
-  if (referenceText) {
-    form.append('reference_text', referenceText);
   }
 
   const response = await apiClient.post<TTSResponse>('/api/tts', form, {
@@ -236,9 +232,28 @@ export async function saveBase64Audio(
   format: string,
 ): Promise<string> {
   const ext = format ?? 'wav';
-  const uri = `${FileSystem.cacheDirectory}tts_output.${ext}`;
+  const timestamp = Date.now();
+  const uri = `${FileSystem.cacheDirectory}tts_output_${timestamp}.${ext}`;
   await FileSystem.writeAsStringAsync(uri, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
+  
+  // Cleanup: delete old TTS files (keep only the current one)
+  try {
+    const cacheDir = FileSystem.cacheDirectory;
+    if (cacheDir) {
+      const files = await FileSystem.readDirectoryAsync(cacheDir);
+      const ttsFiles = files.filter(f => f.startsWith('tts_output_') && f.endsWith(`.${ext}`));
+      for (const file of ttsFiles) {
+        if (file !== `tts_output_${timestamp}.${ext}`) {
+          const fileUri = `${cacheDir}${file}`;
+          await FileSystem.deleteAsync(fileUri);
+        }
+      }
+    }
+  } catch (error) {
+    // Ignore cleanup errors
+  }
+  
   return uri;
 }

@@ -88,7 +88,6 @@ def test_voice_cloning_with_reference_audio(client):
     form_data = {
         "text": "This audio is generated using personal voice cloning on CPU.",
         "language": "English",
-        "reference_text": "Sample speech reference for voice cloning timbre.",
     }
 
     resp = client.post("/api/tts", data=form_data, files=files)
@@ -179,6 +178,14 @@ def test_zero_vram_overhead(client):
     diff_mb = (vram_after - vram_before) / (1024 * 1024)
     assert diff_mb == 0.0, f"TTS should consume 0MB GPU VRAM, but allocated {diff_mb:.2f} MB"
     print(f"✅ Zero GPU VRAM overhead confirmed: {diff_mb:.2f} MB added.")
+
+    # Test reference audio size limit (413 for >20MB)
+    oversized_audio = b"x" * (21 * 1024 * 1024)  # 21 MB
+    files_oversized = {"reference_audio": ("huge.wav", oversized_audio, "audio/wav")}
+    form_oversized = {"text": "test", "language": "English"}
+    resp_oversized = client.post("/api/tts", data=form_oversized, files=files_oversized)
+    assert resp_oversized.status_code == 413, f"Expected 413 for oversized reference audio, got {resp_oversized.status_code}"
+    print("✅ TTS reference audio size limit enforced (413 for >20MB)")
 
 
 if __name__ == "__main__":

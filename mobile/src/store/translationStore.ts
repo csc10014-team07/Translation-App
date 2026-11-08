@@ -27,7 +27,6 @@ export interface TranslationState {
 
   // ── Voice cloning ──
   referenceAudioUri: string | null;
-  referenceText: string;
   synthesizedAudioUri: string | null;
 
   // ── UI state ──
@@ -47,7 +46,6 @@ export interface TranslationState {
   processImage: (imageUri: string) => Promise<void>;
   translate: () => Promise<void>;
   setReferenceAudio: (uri: string) => void;
-  setReferenceText: (text: string) => void;
   synthesize: () => Promise<void>;
   startStreaming: (customUrl?: string) => Promise<void>;
   stopStreaming: () => void;
@@ -70,7 +68,6 @@ const initialState = {
   translatedText: '',
   sourceLanguage: '',
   referenceAudioUri: null as string | null,
-  referenceText: '',
   synthesizedAudioUri: null as string | null,
   isTranscribing: false,
   isOcrProcessing: false,
@@ -153,14 +150,11 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
 
   setReferenceAudio: (uri: string) => set({ referenceAudioUri: uri }),
 
-  setReferenceText: (text: string) => set({ referenceText: text }),
-
   synthesize: async () => {
     const {
       translatedText,
       targetLanguage,
       referenceAudioUri,
-      referenceText,
     } = get();
     if (!translatedText.trim()) {
       set({ error: 'Please translate some text first.' });
@@ -172,7 +166,6 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
         translatedText,
         targetLanguage,
         referenceAudioUri ?? undefined,
-        referenceText || undefined,
       );
       const localUri = await saveBase64Audio(result.audio_base64, result.format);
       set({ synthesizedAudioUri: localUri });

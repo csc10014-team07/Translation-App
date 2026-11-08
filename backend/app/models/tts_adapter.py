@@ -110,7 +110,6 @@ class TTSAdapter:
         text: str,
         language: str = "English",
         reference_audio_path: str | Path | None = None,
-        reference_text: str | None = None,
         voice_style: str | None = None,
         preferred_engine: str | None = None,
     ) -> TTSResult:
