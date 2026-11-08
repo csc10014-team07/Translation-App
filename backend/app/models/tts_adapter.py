@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import tempfile
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -55,6 +56,7 @@ class TTSAdapter:
 
     def __init__(self) -> None:
         self._pocket_model = None
+        self._lock = threading.Lock()
 
     def _load_pocket_tts(self):
         if self._pocket_model is None:
@@ -142,21 +144,22 @@ class TTSAdapter:
             pocket = self._load_pocket_tts()
             if pocket is not None:
                 try:
-                    state = None
-                    if reference_audio_path and Path(reference_audio_path).exists():
-                        try:
-                            state = pocket.get_state_for_audio_prompt(str(reference_audio_path))
-                            logger.info("Pocket TTS voice cloning active from user reference audio.")
-                        except Exception as e:  # noqa: BLE001
-                            logger.info(
-                                "Custom cloning gated by HuggingFace (%s), using default voice 'alba'.", e
-                            )
+                    with self._lock:
+                        state = None
+                        if reference_audio_path and Path(reference_audio_path).exists():
+                            try:
+                                state = pocket.get_state_for_audio_prompt(str(reference_audio_path))
+                                logger.info("Pocket TTS voice cloning active from user reference audio.")
+                            except Exception as e:  # noqa: BLE001
+                                logger.info(
+                                    "Custom cloning gated by HuggingFace (%s), using default voice 'alba'.", e
+                                )
+                                state = pocket.get_state_for_audio_prompt("alba")
+                        else:
                             state = pocket.get_state_for_audio_prompt("alba")
-                    else:
-                        state = pocket.get_state_for_audio_prompt("alba")
 
-                    audio_tensor = pocket.generate_audio(state, text, max_tokens=250)
-                    audio_np = audio_tensor.squeeze().cpu().numpy().astype(np.float32)
+                        audio_tensor = pocket.generate_audio(state, text, max_tokens=250)
+                        audio_np = audio_tensor.squeeze().cpu().numpy().astype(np.float32)
                     return TTSResult(audio_np, pocket.sample_rate, engine="pocket_tts")
                 except Exception as e:  # noqa: BLE001
                     logger.warning("Pocket TTS synthesis failed (%s), falling back to Edge-TTS.", e)

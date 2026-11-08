@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,7 @@ class OCRAdapter:
 
     def __init__(self) -> None:
         self._engine = None
+        self._lock = threading.Lock()
 
     def load(self) -> None:
         """Load RapidOCR engine."""
@@ -74,7 +76,8 @@ class OCRAdapter:
             img_path = str(image_input)
 
         try:
-            result, _ = self._engine(img_path)
+            with self._lock:
+                result, _ = self._engine(img_path)
             if not result:
                 return "", "en", []
 
