@@ -122,21 +122,35 @@ async def synthesise_speech(
         # ── Run Hybrid TTS ────────────────────────────────────────────────
         tts = await manager.get_tts()
         t0 = time.monotonic()
-        tts_result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: tts.synthesize(
-                text=effective_text,
-                language=effective_language,
-                reference_audio_path=ref_audio_path,
-                voice_style=voice_style,
-            ),
-        )
+        try:
+            tts_result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: tts.synthesize(
+                    text=effective_text,
+                    language=effective_language,
+                    reference_audio_path=ref_audio_path,
+                    voice_style=voice_style,
+                ),
+            )
+        except ValueError as exc:
+            # Language or engine not supported
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        except RuntimeError as exc:
+            # Edge-TTS disabled or synthesis failure
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
         elapsed_ms = (time.monotonic() - t0) * 1000
         vram_tracker.record_warm_inference("tts", elapsed_ms)
 
         audio_array = tts_result.audio
         sample_rate = tts_result.sample_rate
         engine_used = tts_result.engine
+        voice_note = tts_result.voice_note if hasattr(tts_result, "voice_note") else None
 
         # ── Encode as base64 WAV ───────────────────────────────────────────
         audio_b64 = _audio_to_wav_base64(audio_array, sample_rate)
@@ -146,6 +160,7 @@ async def synthesise_speech(
             sample_rate=sample_rate,
             format="wav",
             engine=engine_used,
+            voice_note=voice_note,
             elapsed_ms=round(elapsed_ms, 2),
         )
 

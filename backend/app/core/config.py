@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # ── Online fallback ────────────────────────────────────────────────────
     ALLOW_ONLINE_FALLBACK: bool = False
 
+    # ── TTS options ────────────────────────────────────────────────────────
+    EDGE_TTS_ENABLED: bool = True
+
     # ── Server options ─────────────────────────────────────────────────────
     API_PREFIX: str = "/api"
     HOST: str = "0.0.0.0"

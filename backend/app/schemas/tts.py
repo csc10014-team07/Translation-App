@@ -36,6 +36,10 @@ class TTSResponse(BaseModel):
         default="edge_tts",
         description="Synthesis engine used ('pocket_tts' or 'edge_tts').",
     )
+    voice_note: str | None = Field(
+        default=None,
+        description="Additional note about the voice used (e.g., cloning status, default voice).",
+    )
     elapsed_ms: float | None = Field(
         default=None,
         description="Elapsed synthesis time in milliseconds.",
