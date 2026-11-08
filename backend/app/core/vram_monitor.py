@@ -21,13 +21,14 @@ def get_vram_info() -> dict[str, float]:
     if not torch.cuda.is_available():
         return {"used_mb": 0.0, "free_mb": 0.0, "total_mb": 0.0, "allocated_mb": 0.0}
 
-    props = torch.cuda.get_device_properties(0)
+    device = torch.cuda.current_device()
+    props = torch.cuda.get_device_properties(device)
     total_bytes: int = props.total_memory
     # PyTorch tracks *allocated* (used by tensors) separately from *reserved*
     # (cached by the allocator).  We report the allocator-reserved amount as
     # "used" so that the number reflects actual driver-level commitment.
-    reserved_bytes: int = torch.cuda.memory_reserved(0)
-    allocated_bytes: int = torch.cuda.memory_allocated(0)
+    reserved_bytes: int = torch.cuda.memory_reserved(device)
+    allocated_bytes: int = torch.cuda.memory_allocated(device)
 
     used_mb = reserved_bytes / 1024 ** 2
     total_mb = total_bytes / 1024 ** 2

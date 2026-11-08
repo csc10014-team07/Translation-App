@@ -16,13 +16,19 @@ def _resolve_effective_device(device_setting: str) -> str:
             logger.warning("CUDA requested but torch.cuda.is_available() is False — falling back to CPU.")
             return "cpu"
         try:
-            # Test kernel execution (catches older compute capability mismatch)
-            t = torch.tensor([1.0], device="cuda")
+            # Parse device index if specified (e.g., "cuda:1")
+            device_index = 0
+            if ":" in device_setting:
+                parts = device_setting.split(":")
+                if parts[1].isdigit():
+                    device_index = int(parts[1])
+            # Test kernel execution on the specified device (catches older compute capability mismatch)
+            t = torch.tensor([1.0], device=f"cuda:{device_index}")
             _ = t * 2
-            return "cuda"
+            return device_setting
         except Exception as e:
             logger.warning(
-                f"CUDA is present but kernel test failed ({e}) — falling back to CPU."
+                f"CUDA device {device_setting} test failed ({e}) — falling back to CPU."
             )
             return "cpu"
     return device_setting

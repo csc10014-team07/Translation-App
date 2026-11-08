@@ -86,7 +86,12 @@ class ASRAdapter:
         """Load PhoASR pipeline onto target device."""
         if self._pipe is None:
             logger.info("Loading PhoASR (%s) onto %s...", self.model_id, self.device)
-            device_arg = 0 if self.device.startswith("cuda") else -1
+            # Parse device string to get GPU index (e.g., "cuda:1" -> 1, "cuda" -> 0, else -1 for CPU)
+            if self.device.startswith("cuda"):
+                parts = self.device.split(":")
+                device_arg = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+            else:
+                device_arg = -1
             self._pipe = pipeline(
                 "automatic-speech-recognition",
                 model=self.model_id,

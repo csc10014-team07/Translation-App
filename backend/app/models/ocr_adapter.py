@@ -66,7 +66,7 @@ class OCRAdapter:
 
         temp_path = None
         if isinstance(image_input, (bytes, bytearray)):
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False, mode='wb') as tmp:
                 tmp.write(image_input)
                 temp_path = tmp.name
             img_path = temp_path

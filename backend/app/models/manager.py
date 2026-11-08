@@ -80,6 +80,7 @@ class ModelManager:
                 "asr": self._asr is not None and self._asr._pipe is not None,
                 "translation": self._translation is not None
                 and self._translation._llm is not None,
+                "ocr": self._ocr is not None and self._ocr._engine is not None,
                 "tts_pocket": self._tts is not None
                 and self._tts._pocket_model is not None,
             },
