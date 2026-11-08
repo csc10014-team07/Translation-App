@@ -83,20 +83,38 @@ class ModelManager:
         logger.info("ModelManager shutdown complete.")
 
     async def get_asr(self) -> ASRAdapter:
-        """Return the active ASR adapter."""
+        """Return the active ASR adapter. Raises RuntimeError if not loaded after startup."""
         if self._asr is None:
+            if self._is_started:
+                raise RuntimeError(
+                    "ASR adapter not available (failed to load during startup). "
+                    f"Error: {self._startup_errors.get('asr', 'unknown error')}"
+                )
+            # Pre-startup: create instance (should not happen in normal flow)
             self._asr = ASRAdapter(device=self.device)
         return self._asr
 
     async def get_translation(self) -> TranslationAdapter:
-        """Return the active Translation adapter."""
+        """Return the active Translation adapter. Raises RuntimeError if not loaded after startup."""
         if self._translation is None:
+            if self._is_started:
+                raise RuntimeError(
+                    "Translation adapter not available (failed to load during startup). "
+                    f"Error: {self._startup_errors.get('translation', 'unknown error')}"
+                )
+            # Pre-startup: create instance (should not happen in normal flow)
             self._translation = TranslationAdapter()
         return self._translation
 
     async def get_ocr(self) -> OCRAdapter:
-        """Return the active OCR adapter."""
+        """Return the active OCR adapter. Raises RuntimeError if not loaded after startup."""
         if self._ocr is None:
+            if self._is_started:
+                raise RuntimeError(
+                    "OCR adapter not available (failed to load during startup). "
+                    f"Error: {self._startup_errors.get('ocr', 'unknown error')}"
+                )
+            # Pre-startup: create instance (should not happen in normal flow)
             self._ocr = get_ocr_adapter()
         return self._ocr
 
