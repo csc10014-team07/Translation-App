@@ -19,3 +19,4 @@ class HealthResponse(BaseModel):
     vram: VRAMInfo = Field(..., description="VRAM memory usage breakdown")
     vram_allocated_mb: float = Field(0.0, description="VRAM actively allocated to PyTorch tensors in MB")
     vram_total_mb: float = Field(0.0, description="Total VRAM available on default device in MB")
+    models_loaded: dict = Field({}, description="Model loading status")

@@ -99,14 +99,19 @@ def create_app() -> FastAPI:
     # ── Health check ───────────────────────────────────────────────────────
     @application.get("/health", response_model=HealthResponse, tags=["Health"])
     async def health() -> HealthResponse:
-        """Quick liveness probe — returns 200 with status, device, and VRAM allocation."""
+        """Quick liveness probe — returns 200 with status, device, VRAM, and model status."""
+        from app.models.manager import get_model_manager
+
         vram_info = get_vram_info()
+        manager = get_model_manager()
+        model_status = manager.get_status() if manager._is_started else {}
         return HealthResponse(
             status="ok",
             device=settings.effective_device(),
             vram=vram_info,
             vram_allocated_mb=vram_info.get("allocated_mb", 0.0),
             vram_total_mb=vram_info.get("total_mb", 0.0),
+            models_loaded=model_status.get("models_loaded", {}),
         )
 
     return application

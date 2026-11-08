@@ -1,6 +1,7 @@
 """Model Manager singleton orchestrating PhoASR, TranslateGemma, RapidOCR, and Hybrid TTS."""
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from app.core.config import settings
@@ -22,16 +23,50 @@ class ModelManager:
         self._ocr: OCRAdapter | None = None
         self._tts: TTSAdapter | None = None
         self._is_started: bool = False
+        self._startup_errors: dict[str, str] = {}
 
     async def startup(self) -> None:
-        """Initialize core models at server boot."""
+        """Initialize core models at server boot, loading them eagerly."""
         if not self._is_started:
             logger.info("Initializing ModelManager on %s...", self.device)
-            # Preload translation & OCR adapters lazily or eagerly
-            self._translation = TranslationAdapter()
-            self._ocr = get_ocr_adapter()
+            self._startup_errors = {}
+            
+            # Load ASR model (runs in executor to avoid blocking the event loop)
+            try:
+                self._asr = ASRAdapter(device=self.device)
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, self._asr.load)
+                logger.info("PhoASR model loaded successfully.")
+            except Exception as e:
+                logger.error("Failed to load PhoASR model: %s", e)
+                self._startup_errors["asr"] = str(e)
+                self._asr = None
+            
+            # Load Translation model
+            try:
+                self._translation = TranslationAdapter()
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, self._translation.load)
+                logger.info("TranslateGemma model loaded successfully.")
+            except Exception as e:
+                logger.error("Failed to load TranslateGemma model: %s", e)
+                self._startup_errors["translation"] = str(e)
+                self._translation = None
+            
+            # Initialize OCR adapter (CPU, no heavy loading)
+            try:
+                self._ocr = get_ocr_adapter()
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, self._ocr.load)
+                logger.info("RapidOCR engine initialized.")
+            except Exception as e:
+                logger.error("Failed to initialize RapidOCR: %s", e)
+                self._startup_errors["ocr"] = str(e)
+                self._ocr = None
+            
+            # Initialize TTS adapter (CPU, lazy loading of models)
             self._tts = TTSAdapter()
-            self._asr = ASRAdapter(device=self.device)
+            
             self._is_started = True
             logger.info("ModelManager startup complete.")
 
@@ -84,6 +119,7 @@ class ModelManager:
                 "tts_pocket": self._tts is not None
                 and self._tts._pocket_model is not None,
             },
+            "load_errors": self._startup_errors.copy(),
         }
 
 
