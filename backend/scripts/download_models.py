@@ -94,16 +94,16 @@ def download_pocket_tts(languages: list[str]) -> None:
         lang_normalized = lang.strip().lower()
         if lang_normalized not in POCKET_TTS_SUPPORTED_LANGUAGES:
             print(
-                f"  ⚠️ Skipping unsupported Pocket TTS language '{lang}'. "
+                f"  Skipping unsupported Pocket TTS language '{lang}'. "
                 f"Available: {', '.join(POCKET_TTS_SUPPORTED_LANGUAGES)}"
             )
             continue
         try:
             print(f"  --> Downloading/caching Pocket TTS for '{lang_normalized}'...")
             TTSModel.load_model(language=lang_normalized)
-            print(f"  ✓ Pocket TTS for '{lang_normalized}' ready.")
+            print(f"  Pocket TTS for '{lang_normalized}' ready.")
         except Exception as exc:
-            print(f"  ❌ Failed to download Pocket TTS for '{lang_normalized}': {exc}")
+            print(f"  Failed to download Pocket TTS for '{lang_normalized}': {exc}")
 
     print("Pocket TTS pre-download complete.")
 
