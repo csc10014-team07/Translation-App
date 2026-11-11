@@ -90,6 +90,12 @@ async def ocr_image(
         extracted_text, detected_lang, boxes = await asyncio.get_event_loop().run_in_executor(
             None, ocr.extract_text, image_bytes
         )
+    except RuntimeError as exc:
+        logger.warning("OCR engine unavailable: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OCR service unavailable.",
+        ) from exc
     except Exception as exc:
         logger.exception("RapidOCR extraction failed")
         raise HTTPException(

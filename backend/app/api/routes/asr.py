@@ -119,6 +119,12 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail="Internal server error during ASR.") from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        logger.warning("ASR service unavailable: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ASR service unavailable.",
+        ) from exc
     except Exception as exc:
         err_msg = str(exc)
         exc_type = type(exc).__name__

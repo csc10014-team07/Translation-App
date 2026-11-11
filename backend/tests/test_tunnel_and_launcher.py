@@ -2,11 +2,15 @@
 
 Seam: Tunnel launcher and mobile configuration interface.
 """
+import io
 import re
+import tarfile
 from pathlib import Path
 
 from scripts.start_tunnel_and_server import (
+    ensure_cloudflared,
     extract_tunnel_url,
+    get_cloudflared_download_info,
     get_local_ip,
     update_mobile_config,
 )
@@ -71,3 +75,53 @@ def test_update_mobile_config_local_http(tmp_path: Path):
     content = target_config.read_text(encoding="utf-8")
     assert f"export const API_BASE_URL = '{local_url}';" in content
     assert "export const WS_BASE_URL = 'ws://192.168.1.150:8000/ws/stream';" in content
+
+
+def test_get_cloudflared_download_info_macos_arm64(monkeypatch):
+    """macOS arm64 downloads the matching .tgz archive."""
+    import scripts.start_tunnel_and_server as launcher
+
+    monkeypatch.setattr(launcher.sys, "platform", "darwin")
+    monkeypatch.setattr(launcher.platform, "machine", lambda: "arm64")
+
+    url, bin_name = get_cloudflared_download_info()
+    assert url.endswith("cloudflared-darwin-arm64.tgz")
+    assert bin_name == "cloudflared"
+
+
+def test_ensure_cloudflared_extracts_macos_tgz(tmp_path: Path, monkeypatch):
+    """A macOS .tgz download must be unpacked to an executable, not chmod'd raw."""
+    import shutil as shutil_mod
+
+    import scripts.start_tunnel_and_server as launcher
+
+    binary_payload = b"#!/bin/sh\necho cloudflared\n"
+
+    monkeypatch.setattr(launcher, "TOOLS_DIR", tmp_path)
+    monkeypatch.setattr(
+        launcher,
+        "get_cloudflared_download_info",
+        lambda: (
+            "https://example.com/cloudflared-darwin-arm64.tgz",
+            "cloudflared",
+        ),
+    )
+    monkeypatch.setattr(shutil_mod, "which", lambda _name: None)
+
+    def _fake_urlretrieve(url: str, filename: str, reporthook=None):
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+            info = tarfile.TarInfo("cloudflared")
+            info.size = len(binary_payload)
+            archive.addfile(info, io.BytesIO(binary_payload))
+        Path(filename).write_bytes(buffer.getvalue())
+        return filename, None
+
+    monkeypatch.setattr(launcher.urllib.request, "urlretrieve", _fake_urlretrieve)
+
+    result = ensure_cloudflared()
+
+    assert result == tmp_path / "cloudflared"
+    assert result is not None
+    assert result.read_bytes() == binary_payload
+    assert result.stat().st_mode & 0o111, "Extracted cloudflared must be executable"

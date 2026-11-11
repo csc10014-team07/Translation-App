@@ -385,3 +385,58 @@ def test_stop_mid_speech_processes_buffered_audio():
         f"'stop' mid-speech must have processed the buffered audio; got: {asr_texts}"
     )
     assert transcribed, "ASR transcribe must have been called"
+
+
+# ---------------------------------------------------------------------------
+# (f) Malformed control payloads must never crash the session.
+# ---------------------------------------------------------------------------
+
+
+def test_non_object_json_does_not_disconnect():
+    """JSON payloads that are not objects yield an error event, not a disconnect."""
+
+    manager, *_ = _simple_manager()
+    app_ = _make_test_app(manager)
+
+    from starlette.testclient import TestClient
+
+    client = TestClient(app_)
+    with client.websocket_connect("/ws/stream") as ws:
+        assert ws.receive_json()["type"] == "ready"
+
+        for payload in ([1, 2], "hello", 5, None):
+            ws.send_json(payload)
+            msg = ws.receive_json()
+            assert msg["type"] == "error", f"Expected error for {payload!r}, got {msg}"
+            assert msg.get("message")
+            assert msg.get("error") == msg.get("message")
+
+        ws.send_json({"action": "stop"})
+        while True:
+            msg = ws.receive_json()
+            if msg.get("type") == "stopped":
+                break
+
+
+def test_translate_text_non_string_does_not_disconnect():
+    """A non-string 'text' field is rejected without closing the WebSocket."""
+
+    manager, *_ = _simple_manager()
+    app_ = _make_test_app(manager)
+
+    from starlette.testclient import TestClient
+
+    client = TestClient(app_)
+    with client.websocket_connect("/ws/stream") as ws:
+        assert ws.receive_json()["type"] == "ready"
+
+        ws.send_json({"action": "translate_text", "text": 123})
+        msg = ws.receive_json()
+        assert msg["type"] == "error"
+        assert "text" in msg["message"].lower()
+
+        ws.send_json({"action": "stop"})
+        while True:
+            msg = ws.receive_json()
+            if msg.get("type") == "stopped":
+                break

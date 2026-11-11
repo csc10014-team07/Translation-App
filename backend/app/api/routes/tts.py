@@ -12,11 +12,12 @@ import aiofiles
 import numpy as np
 import soundfile as sf
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
+from pydantic import ValidationError
 
 from app.api.deps import dep_model_manager
 from app.core.vram_monitor import vram_tracker
 from app.models.manager import ModelManager
-from app.schemas.tts import TTSResponse
+from app.schemas.tts import TTSRequest, TTSResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["TTS"])
@@ -63,16 +64,27 @@ async def synthesise_speech(
     if content_type.startswith("application/json"):
         try:
             body = await request.json()
-            if isinstance(body, dict):
-                text = body.get("text", text)
-                language = body.get("language", language)
-                target_language = body.get("target_language", target_language)
-                voice_style = body.get("voice_style", voice_style)
         except Exception as err:  # noqa: BLE001
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid JSON body",
             ) from err
+        if not isinstance(body, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="JSON body must be an object",
+            )
+        try:
+            parsed = TTSRequest.model_validate(body)
+        except ValidationError as err:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=err.errors(),
+            ) from err
+        text = parsed.text
+        language = parsed.language
+        target_language = parsed.target_language
+        voice_style = parsed.voice_style
 
     # ── Validate text and language ─────────────────────────────────────────
     effective_text = (text or "").strip()

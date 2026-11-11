@@ -36,6 +36,9 @@ EDGE_VOICES_FEMALE = {
     "fr": "fr-FR-DeniseNeural", "french": "fr-FR-DeniseNeural",
     "de": "de-DE-KatjaNeural", "german": "de-DE-KatjaNeural",
     "es": "es-ES-ElviraNeural", "spanish": "es-ES-ElviraNeural",
+    "pt": "pt-BR-FranciscaNeural", "portuguese": "pt-BR-FranciscaNeural",
+    "it": "it-IT-ElsaNeural", "italian": "it-IT-ElsaNeural",
+    "ru": "ru-RU-SvetlanaNeural", "russian": "ru-RU-SvetlanaNeural",
 }
 
 EDGE_VOICES_MALE = {
@@ -47,6 +50,9 @@ EDGE_VOICES_MALE = {
     "fr": "fr-FR-HenriNeural", "french": "fr-FR-HenriNeural",
     "de": "de-DE-KillianNeural", "german": "de-DE-KillianNeural",
     "es": "es-ES-AlvaroNeural", "spanish": "es-ES-AlvaroNeural",
+    "pt": "pt-BR-AntonioNeural", "portuguese": "pt-BR-AntonioNeural",
+    "it": "it-IT-DiegoNeural", "italian": "it-IT-DiegoNeural",
+    "ru": "ru-RU-DmitryNeural", "russian": "ru-RU-DmitryNeural",
 }
 
 EDGE_VOICES = EDGE_VOICES_FEMALE

@@ -53,6 +53,27 @@ class VADSettings:
     rms_threshold: float = 0.012
     silence_duration_s: float = 0.45
     min_speech_samples: int = 4800  # 300ms speech minimum
+    stop_drain_timeout_s: float = 30.0
+
+
+async def _send_error(
+    websocket: WebSocket,
+    ws_lock: asyncio.Lock,
+    exc: Exception,
+) -> None:
+    """Send an error event without letting a closed socket kill the worker."""
+    message = str(exc)
+    payload = {
+        "type": "error",
+        "event": "error",
+        "message": message,
+        "error": message,
+    }
+    try:
+        async with ws_lock:
+            await websocket.send_json(payload)
+    except Exception:  # noqa: BLE001
+        logger.debug("Could not deliver error event to client", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -87,12 +108,7 @@ async def _utterance_worker(
                     await _process_utterance(websocket, ws_lock, pcm_bytes, config)
                 except Exception as exc:
                     logger.exception("Worker: utterance processing failed")
-                    async with ws_lock:
-                        await websocket.send_json({
-                            "type": "error",
-                            "event": "error",
-                            "message": str(exc),
-                        })
+                    await _send_error(websocket, ws_lock, exc)
 
             elif kind == "text":
                 text: str = payload
@@ -107,12 +123,7 @@ async def _utterance_worker(
                     await _stream_translation_and_tts(websocket, ws_lock, text, config)
                 except Exception as exc:
                     logger.exception("Worker: text job failed")
-                    async with ws_lock:
-                        await websocket.send_json({
-                            "type": "error",
-                            "event": "error",
-                            "message": str(exc),
-                        })
+                    await _send_error(websocket, ws_lock, exc)
 
         finally:
             queue.task_done()
@@ -153,12 +164,7 @@ async def _process_utterance(
         except ValueError as exc:
             # Enforce audio-quality / duration guard from the ASR adapter.
             logger.warning("ASR rejected utterance: %s", exc)
-            async with ws_lock:
-                await websocket.send_json({
-                    "type": "error",
-                    "event": "error",
-                    "message": str(exc),
-                })
+            await _send_error(websocket, ws_lock, exc)
             return
 
         asr_ms = (time.monotonic() - t0) * 1000
@@ -349,15 +355,42 @@ async def websocket_stream_endpoint(websocket: WebSocket) -> None:
                     logger.debug("Failed to parse JSON message: %s", exc)
                     continue
 
+                if not isinstance(payload, dict):
+                    logger.debug("Ignoring non-object JSON message: %r", type(payload))
+                    await _send_error(
+                        websocket,
+                        ws_lock,
+                        ValueError("Control message must be a JSON object."),
+                    )
+                    continue
+
                 action = payload.get("action", "")
+                if not isinstance(action, str):
+                    await _send_error(
+                        websocket,
+                        ws_lock,
+                        ValueError("Field 'action' must be a string."),
+                    )
+                    continue
 
                 if action == "start":
-                    config["source_lang"] = payload.get("source_lang", config["source_lang"])
-                    config["target_lang"] = payload.get("target_lang", config["target_lang"])
+                    source_lang = payload.get("source_lang", config["source_lang"])
+                    target_lang = payload.get("target_lang", config["target_lang"])
                     preset = payload.get("context_preset", "")
                     custom = payload.get("custom_context", "")
-                    config["context"] = f"{preset} {custom}".strip()
-                    config["clone_voice"] = payload.get("clone_voice", False)
+                    if not isinstance(source_lang, str) or not isinstance(target_lang, str):
+                        await _send_error(
+                            websocket,
+                            ws_lock,
+                            ValueError("source_lang and target_lang must be strings."),
+                        )
+                        continue
+                    config["source_lang"] = source_lang
+                    config["target_lang"] = target_lang
+                    clean_preset = preset if isinstance(preset, str) else ""
+                    clean_custom = custom if isinstance(custom, str) else ""
+                    config["context"] = f"{clean_preset} {clean_custom}".strip()
+                    config["clone_voice"] = bool(payload.get("clone_voice", False))
                     async with ws_lock:
                         await websocket.send_json({
                             "type": "config_updated",
@@ -378,7 +411,15 @@ async def websocket_stream_endpoint(websocket: WebSocket) -> None:
 
                 elif action == "translate_text":
                     # Direct text streaming test / trigger — enqueue as text job.
-                    input_text = payload.get("text", "").strip()
+                    raw_text = payload.get("text", "")
+                    if not isinstance(raw_text, str):
+                        await _send_error(
+                            websocket,
+                            ws_lock,
+                            ValueError("Field 'text' must be a string."),
+                        )
+                        continue
+                    input_text = raw_text.strip()
                     if input_text:
                         job_queue.put_nowait(("text", input_text))
 
@@ -395,8 +436,18 @@ async def websocket_stream_endpoint(websocket: WebSocket) -> None:
 
                     # Signal the worker to stop after finishing queued jobs.
                     job_queue.put_nowait(_STOP)
-                    # Wait for all queued jobs (including the utterance) to drain.
-                    await job_queue.join()
+                    # Wait for all queued jobs (including the utterance) to drain,
+                    # but never hang if the worker has already died.
+                    try:
+                        await asyncio.wait_for(
+                            job_queue.join(),
+                            timeout=VADSettings.stop_drain_timeout_s,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning(
+                            "Timed out draining jobs after 'stop' (%.1fs).",
+                            VADSettings.stop_drain_timeout_s,
+                        )
                     async with ws_lock:
                         await websocket.send_json({"type": "stopped", "event": "stopped"})
                     break

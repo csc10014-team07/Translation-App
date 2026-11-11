@@ -188,5 +188,35 @@ def test_zero_vram_overhead(client):
     print("✅ TTS reference audio size limit enforced (413 for >20MB)")
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"text": 123},
+        {"text": "hello", "language": 5},
+        {"text": "hello", "target_language": 5},
+        {"text": "hello", "voice_style": 5},
+    ],
+)
+def test_tts_json_invalid_types_return_422(client, payload):
+    """Malformed JSON types must be rejected before the TTS engine is invoked."""
+    resp = client.post("/api/tts", json=payload)
+    assert resp.status_code == 422, f"Expected 422, got {resp.status_code}: {resp.text}"
+
+
+def test_tts_json_non_object_returns_400(client):
+    """A JSON array is not a valid TTS request body."""
+    resp = client.post("/api/tts", json=["hello"])
+    assert resp.status_code == 400, f"Expected 400, got {resp.status_code}: {resp.text}"
+
+
+def test_edge_voices_cover_mobile_languages():
+    """Languages offered by the mobile UI must have Edge-TTS voices."""
+    from app.models.tts_adapter import EDGE_VOICES_FEMALE, EDGE_VOICES_MALE
+
+    for code in ("pt", "it", "ru"):
+        assert code in EDGE_VOICES_FEMALE, f"Missing female Edge voice for {code}"
+        assert code in EDGE_VOICES_MALE, f"Missing male Edge voice for {code}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

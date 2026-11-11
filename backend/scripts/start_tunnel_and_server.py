@@ -9,10 +9,13 @@ Features:
 - Displays connection URLs, QR instructions, and handles clean Ctrl+C shutdown.
 """
 import argparse
+import platform
 import re
 import socket
 import subprocess
 import sys
+import tarfile
+import tempfile
 import threading
 import time
 import urllib.request
@@ -39,8 +42,10 @@ def get_cloudflared_download_info() -> tuple[str, str]:
             "cloudflared.exe",
         )
     elif sys.platform.startswith("darwin"):
+        machine = platform.machine().lower()
+        arch = "arm64" if machine in ("arm64", "aarch64") else "amd64"
         return (
-            "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz",
+            f"https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-{arch}.tgz",
             "cloudflared",
         )
     else:  # Linux / Google Colab
@@ -84,7 +89,14 @@ def ensure_cloudflared() -> Path | None:
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
     local_binary = TOOLS_DIR / bin_name
     if local_binary.exists() and local_binary.stat().st_size > 1_000_000:
-        return local_binary
+        # A previous broken macOS run may have left the raw .tgz in place.
+        try:
+            with local_binary.open("rb") as fh:
+                is_compressed_archive = fh.read(2) == b"\x1f\x8b"
+        except OSError:
+            return local_binary
+        if not is_compressed_archive:
+            return local_binary
 
     # 3. Download official binary
     print(f"📥 Downloading cloudflared for {sys.platform} from GitHub releases...")
@@ -96,7 +108,30 @@ def ensure_cloudflared() -> Path | None:
         sys.stdout.flush()
 
     try:
-        urllib.request.urlretrieve(download_url, str(local_binary), reporthook=_progress)
+        if download_url.endswith(".tgz"):
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                archive_path = Path(tmp_dir) / "cloudflared.tgz"
+                urllib.request.urlretrieve(
+                    download_url, str(archive_path), reporthook=_progress
+                )
+                with tarfile.open(archive_path, "r:gz") as archive:
+                    member = next(
+                        (
+                            item
+                            for item in archive.getmembers()
+                            if Path(item.name).name == bin_name and item.isfile()
+                        ),
+                        None,
+                    )
+                    if member is None:
+                        raise RuntimeError(f"{bin_name} not found in downloaded archive")
+                    source = archive.extractfile(member)
+                    if source is None:
+                        raise RuntimeError(f"Could not read {bin_name} from archive")
+                    with local_binary.open("wb") as destination:
+                        shutil.copyfileobj(source, destination)
+        else:
+            urllib.request.urlretrieve(download_url, str(local_binary), reporthook=_progress)
         if not sys.platform.startswith("win"):
             import stat
             local_binary.chmod(local_binary.stat().st_mode | stat.S_IEXEC)
@@ -217,41 +252,47 @@ def main() -> None:
         if cf_bin and cf_bin.exists():
             print(f"\n🌐 Establishing Cloudflare Quick Tunnel to http://localhost:{port}...")
             tunnel_cmd = [str(cf_bin), "tunnel", "--url", f"http://localhost:{port}"]
-            tunnel_proc = subprocess.Popen(
-                tunnel_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
+            try:
+                tunnel_proc = subprocess.Popen(
+                    tunnel_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+            except OSError as exc:
+                print(f"⚠️  Could not start cloudflared: {exc}")
+                print("   Falling back to Local LAN mode.")
+                tunnel_proc = None
 
-            # Monitor tunnel output for generated URL
-            start_t = time.time()
-            collected_lines: list[str] = []
-            while time.time() - start_t < 25:
-                if tunnel_proc.poll() is not None:
-                    print("⚠️  Cloudflare tunnel process terminated prematurely.")
-                    break
-                line = tunnel_proc.stdout.readline()
-                if not line:
-                    time.sleep(0.1)
-                    continue
-                collected_lines.append(line)
-                found = extract_tunnel_url([line])
-                if found:
-                    tunnel_url = found
-                    break
+            if tunnel_proc is not None and tunnel_proc.stdout is not None:
+                # Monitor tunnel output for generated URL
+                start_t = time.time()
+                collected_lines: list[str] = []
+                while time.time() - start_t < 25:
+                    if tunnel_proc.poll() is not None:
+                        print("⚠️  Cloudflare tunnel process terminated prematurely.")
+                        break
+                    line = tunnel_proc.stdout.readline()
+                    if not line:
+                        time.sleep(0.1)
+                        continue
+                    collected_lines.append(line)
+                    found = extract_tunnel_url([line])
+                    if found:
+                        tunnel_url = found
+                        break
 
-            # Continue draining tunnel output in background so pipe buffer never fills
-            threading.Thread(
-                target=_drain_stream,
-                args=(tunnel_proc.stdout, collected_lines),
-                daemon=True,
-            ).start()
+                # Continue draining tunnel output in background so pipe buffer never fills
+                threading.Thread(
+                    target=_drain_stream,
+                    args=(tunnel_proc.stdout, collected_lines),
+                    daemon=True,
+                ).start()
 
-            if not tunnel_url:
-                print("⚠️  Cloudflare tunnel URL not detected within timeout. Falling back to local LAN.")
+                if not tunnel_url:
+                    print("⚠️  Cloudflare tunnel URL not detected within timeout. Falling back to local LAN.")
 
     active_url = tunnel_url or f"http://{local_ip}:{port}"
     update_mobile_config(active_url)
