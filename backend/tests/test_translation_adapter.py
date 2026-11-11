@@ -1,5 +1,5 @@
 """Unit and seam tests for TranslationAdapter (Ticket 02)."""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from app.models.translation_adapter import (
     CONTEXT_PRESETS,
@@ -83,57 +83,51 @@ def test_fallback_tier1_translategemma():
     assert fake_llm.called
 
 
-def test_fallback_tier2_ollama():
-    """Verify Tier 2 probes Ollama when _llm is None."""
+def test_translation_model_not_loaded_raises_runtime_error():
+    """Verify RuntimeError is raised when _llm is not loaded (fallback removed in 1628c44)."""
+    import pytest
+
     adapter = TranslationAdapter()
     adapter._llm = None
 
-    with patch.object(adapter, "_query_ollama", return_value="Ollama translated text") as mock_ollama:
-        text, engine = adapter.translate_with_engine(
+    with pytest.raises(RuntimeError, match="TranslateGemma model is not loaded"):
+        adapter.translate(
             text="Kiểm tra",
             target_language="English",
             source_language="vi",
         )
-        assert text == "Ollama translated text"
-        assert engine == "ollama:gemma2"
-        assert mock_ollama.called
 
 
-def test_fallback_tier3_mymemory():
-    """Verify Tier 3 falls back to MyMemoryTranslator when _llm and Ollama fail."""
+def test_translation_empty_output_raises_runtime_error():
+    """Verify RuntimeError is raised when TranslateGemma produces empty output."""
+    import pytest
+
     adapter = TranslationAdapter()
-    adapter._llm = None
+    fake_llm = MagicMock(return_value={"choices": [{"text": ""}]})
+    adapter._llm = fake_llm
 
-    with (
-        patch.object(adapter, "_query_ollama", return_value=None),
-        patch("deep_translator.MyMemoryTranslator.translate", return_value="Neural fallback text") as mock_mm,
-    ):
-        text, engine = adapter.translate_with_engine(
+    with pytest.raises(RuntimeError, match="returned empty response"):
+        adapter.translate(
             text="Xin chào",
             target_language="English",
             source_language="vi",
         )
-        assert text == "Neural fallback text"
-        assert engine == "mymemory"
-        assert mock_mm.called
 
 
-def test_fallback_tier4_degraded():
-    """Verify Tier 4 produces degraded echo when all inference engines fail."""
+def test_translation_inference_failure_raises_runtime_error():
+    """Verify inference exceptions are converted to RuntimeError."""
+    import pytest
+
     adapter = TranslationAdapter()
-    adapter._llm = None
+    fake_llm = MagicMock(side_effect=Exception("CUDA out of memory"))
+    adapter._llm = fake_llm
 
-    with (
-        patch.object(adapter, "_query_ollama", return_value=None),
-        patch("deep_translator.MyMemoryTranslator.translate", side_effect=Exception("Network down")),
-    ):
-        text, engine = adapter.translate_with_engine(
+    with pytest.raises(RuntimeError, match="Translation failed"):
+        adapter.translate(
             text="Xin chào",
             target_language="English",
             source_language="vi",
         )
-        assert text == "[English] Xin chào"
-        assert engine == "fallback:degraded"
 
 
 
