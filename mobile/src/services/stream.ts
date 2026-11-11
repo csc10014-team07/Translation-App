@@ -9,6 +9,7 @@ export interface StreamEvent {
   text?: string;
   token?: string;
   error?: string;
+  message?: string;
   audio?: string;
   audio_b64?: string;
 }
@@ -39,6 +40,13 @@ export class StreamClient {
   connect(customUrl?: string): Promise<void> {
     const wsUrl = customUrl || getStreamWebSocketUrl();
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const settle = (action: () => void) => {
+        if (settled) return;
+        settled = true;
+        action();
+      };
+
       try {
         this.ws = new WebSocket(wsUrl);
 
@@ -53,7 +61,7 @@ export class StreamClient {
             clone_voice: this.options.cloneVoice ?? false,
           };
           this.ws?.send(JSON.stringify(handshake));
-          resolve();
+          settle(() => resolve());
         };
 
         this.ws.onmessage = (event: WebSocketMessageEvent) => {
@@ -79,7 +87,7 @@ export class StreamClient {
                   }
                   break;
                 case 'error':
-                  this.options.onError?.(data.error);
+                  this.options.onError?.(data.error || data.message);
                   break;
               }
               const audioPayload = data.audio_b64 || data.audio;
@@ -94,14 +102,15 @@ export class StreamClient {
 
         this.ws.onerror = (err) => {
           this.options.onError?.('WebSocket connection error');
-          reject(err);
+          settle(() => reject(err));
         };
 
         this.ws.onclose = () => {
           this.options.onClose?.();
+          settle(() => reject(new Error('WebSocket closed before opening')));
         };
       } catch (err) {
-        reject(err);
+        settle(() => reject(err));
       }
     });
   }
