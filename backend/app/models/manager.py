@@ -134,8 +134,11 @@ class ModelManager:
                 "translation": self._translation is not None
                 and self._translation._llm is not None,
                 "ocr": self._ocr is not None and self._ocr._engine is not None,
-                "tts_pocket": self._tts is not None
-                and self._tts._pocket_model is not None,
+                "tts_pocket": (
+                    self._tts is not None
+                    and bool(getattr(self._tts, "_pocket_models", None))
+                    and any(m is not None for m in self._tts._pocket_models.values())
+                ),
             },
             "load_errors": self._startup_errors.copy(),
         }
