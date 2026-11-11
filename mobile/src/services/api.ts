@@ -153,11 +153,12 @@ export async function ocrImage(
 }
 
 /**
- * POST /api/translate — translate Vietnamese text to the target language.
+ * POST /api/translate — translate text between supported languages.
  */
 export async function translateText(
   text: string,
   targetLanguage: string,
+  sourceLanguage = 'vi',
   context?: string,
   contextPreset?: string,
   customContext?: string,
@@ -165,12 +166,14 @@ export async function translateText(
   const body: {
     text: string;
     target_language: string;
+    source_language: string;
     context?: string;
     context_preset?: string;
     custom_context?: string;
   } = {
     text,
     target_language: targetLanguage,
+    source_language: sourceLanguage,
   };
   if (context) body.context = context;
   if (contextPreset) body.context_preset = contextPreset;

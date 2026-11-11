@@ -15,17 +15,26 @@ import { TARGET_LANGUAGES } from '../constants/languages';
 interface Props {
   selectedCode: string;
   onSelect: (code: string) => void;
+  label?: string;
+  title?: string;
+  languages?: readonly { code: string; name: string }[];
 }
 
 const PRIMARY = '#4F46E5';
 
-export default function LanguagePicker({ selectedCode, onSelect }: Props) {
+export default function LanguagePicker({
+  selectedCode,
+  onSelect,
+  label = 'Translate to',
+  title = 'Select Language',
+  languages = TARGET_LANGUAGES,
+}: Props) {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
   const [visible, setVisible] = useState(false);
 
   const selectedLang =
-    TARGET_LANGUAGES.find((l) => l.code === selectedCode) ?? TARGET_LANGUAGES[0];
+    languages.find((l) => l.code === selectedCode) ?? languages[0];
 
   const handleSelect = (code: string) => {
     onSelect(code);
@@ -38,13 +47,13 @@ export default function LanguagePicker({ selectedCode, onSelect }: Props) {
         style={[styles.trigger, isDark && styles.triggerDark]}
         onPress={() => setVisible(true)}
         activeOpacity={0.8}
-        accessibilityLabel={`Target language: ${selectedLang.name}. Tap to change.`}
+        accessibilityLabel={`${label}: ${selectedLang.name}. Tap to change.`}
         accessibilityRole="button"
       >
         <View style={styles.triggerLeft}>
           <Ionicons name="language" size={20} color={PRIMARY} />
           <Text style={[styles.triggerLabel, isDark && styles.textDark]}>
-            Translate to
+            {label}
           </Text>
         </View>
         <View style={styles.triggerRight}>
@@ -69,14 +78,14 @@ export default function LanguagePicker({ selectedCode, onSelect }: Props) {
         >
           <View style={styles.sheetHeader}>
             <Text style={[styles.sheetTitle, isDark && styles.textDark]}>
-              Select Language
+              {title}
             </Text>
             <TouchableOpacity onPress={() => setVisible(false)} accessibilityLabel="Close language picker">
               <Ionicons name="close" size={24} color={isDark ? '#ccc' : '#444'} />
             </TouchableOpacity>
           </View>
           <FlatList
-            data={TARGET_LANGUAGES}
+            data={languages}
             keyExtractor={(item) => item.code}
             renderItem={({ item }) => {
               const active = item.code === selectedCode;

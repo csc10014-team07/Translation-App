@@ -30,6 +30,9 @@ LANGUAGE_NAMES = {
     "fr": "French", "french": "French",
     "de": "German", "german": "German",
     "es": "Spanish", "spanish": "Spanish",
+    "pt": "Portuguese", "portuguese": "Portuguese",
+    "ru": "Russian", "russian": "Russian",
+    "it": "Italian", "italian": "Italian",
 }
 
 

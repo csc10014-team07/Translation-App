@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslationStore } from '../store/translationStore';
 import { isLiveAudioSupported } from '../services/liveAudio';
+import { getLanguageName, supportsSpeechToText } from '../constants/languages';
 import InputModeSelector from '../components/InputModeSelector';
 import VoiceRecorder from '../components/VoiceRecorder';
 import ImagePickerButton from '../components/ImagePickerButton';
@@ -29,6 +30,7 @@ export default function TranslationScreen() {
 
   const {
     inputMode,
+    inputLanguage,
     vietnameseText,
     context,
     targetLanguage,
@@ -42,6 +44,7 @@ export default function TranslationScreen() {
     isStreaming,
     error,
     setInputMode,
+    setInputLanguage,
     setVietnameseText,
     setContext,
     setTargetLanguage,
@@ -80,6 +83,8 @@ export default function TranslationScreen() {
   }, [stopStreaming]);
 
   const isProcessingInput = isTranscribing || isOcrProcessing;
+  const inputLanguageName = getLanguageName(inputLanguage);
+  const speechInputEnabled = supportsSpeechToText(inputLanguage);
 
   return (
     <ScrollView
@@ -105,72 +110,99 @@ export default function TranslationScreen() {
       {/* ── Input Mode Selector ── */}
       <InputModeSelector mode={inputMode} onChangeMode={setInputMode} />
 
+      {/* ── Input Language ── */}
+      <LanguagePicker
+        selectedCode={inputLanguage}
+        onSelect={setInputLanguage}
+        label="Input language"
+        title="Select input language"
+      />
+
       {/* ── Input Area ── */}
       {inputMode === 'text' && (
         <TextInput
           style={[styles.textInput, isDark && styles.textInputDark]}
           value={vietnameseText}
           onChangeText={setVietnameseText}
-          placeholder="Type Vietnamese text here…"
+          placeholder={`Type ${inputLanguageName} text here…`}
           placeholderTextColor={isDark ? '#555' : '#bbb'}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
-          accessibilityLabel="Vietnamese text input"
+          accessibilityLabel={`${inputLanguageName} text input`}
         />
       )}
 
       {inputMode === 'voice' && (
-        <>
-          <View style={styles.streamControlRow}>
-            <TouchableOpacity
-              style={[
-                styles.streamButton,
-                isStreaming ? styles.streamButtonActive : styles.streamButtonInactive,
-              ]}
-              onPress={() => (isStreaming ? stopStreaming() : startStreaming())}
-            >
-              <Ionicons
-                name={isStreaming ? 'radio' : 'radio-outline'}
-                size={16}
-                color={isStreaming ? '#fff' : PRIMARY}
-              />
-              <Text
+        speechInputEnabled ? (
+          <>
+            <View style={styles.streamControlRow}>
+              <TouchableOpacity
                 style={[
-                  styles.streamButtonText,
-                  { color: isStreaming ? '#fff' : PRIMARY },
+                  styles.streamButton,
+                  isStreaming ? styles.streamButtonActive : styles.streamButtonInactive,
                 ]}
+                onPress={() => (isStreaming ? stopStreaming() : startStreaming())}
               >
-                {isStreaming ? 'Stop Live Mic Stream' : '⚡ Start Live Mic Stream'}
+                <Ionicons
+                  name={isStreaming ? 'radio' : 'radio-outline'}
+                  size={16}
+                  color={isStreaming ? '#fff' : PRIMARY}
+                />
+                <Text
+                  style={[
+                    styles.streamButtonText,
+                    { color: isStreaming ? '#fff' : PRIMARY },
+                  ]}
+                >
+                  {isStreaming ? 'Stop Live Mic Stream' : '⚡ Start Live Mic Stream'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {!isLiveAudioSupported() && (
+              <Text style={[styles.streamHint, isDark && styles.textDark]}>
+                Live mic requires a development build (not Expo Go).
               </Text>
-            </TouchableOpacity>
-          </View>
-          {!isLiveAudioSupported() && (
-            <Text style={[styles.streamHint, isDark && styles.textDark]}>
-              Live mic requires a development build (not Expo Go).
+            )}
+            {isStreaming && (
+              <View style={styles.processingRow}>
+                <ActivityIndicator color={PRIMARY} size="small" />
+                <Text style={[styles.processingText, isDark && styles.textDark]}>
+                  Streaming microphone audio & tokens over /ws/stream…
+                </Text>
+              </View>
+            )}
+            <VoiceRecorder
+              onRecordingComplete={handleVoiceRecorded}
+              disabled={isTranscribing || isStreaming}
+            />
+            {isTranscribing && (
+              <View style={styles.processingRow}>
+                <ActivityIndicator color={PRIMARY} size="small" />
+                <Text style={[styles.processingText, isDark && styles.textDark]}>
+                  Transcribing audio…
+                </Text>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={[styles.sttNotice, isDark && styles.sttNoticeDark]}>
+            <Ionicons
+              name="mic-off"
+              size={20}
+              color={isDark ? '#fbbf24' : '#b45309'}
+            />
+            <Text
+              style={[
+                styles.sttNoticeText,
+                isDark && styles.sttNoticeTextDark,
+              ]}
+            >
+              Speech-to-text is only available for Vietnamese. Switch the input
+              language to Vietnamese or use text input.
             </Text>
-          )}
-          {isStreaming && (
-            <View style={styles.processingRow}>
-              <ActivityIndicator color={PRIMARY} size="small" />
-              <Text style={[styles.processingText, isDark && styles.textDark]}>
-                Streaming microphone audio & tokens over /ws/stream…
-              </Text>
-            </View>
-          )}
-          <VoiceRecorder
-            onRecordingComplete={handleVoiceRecorded}
-            disabled={isTranscribing || isStreaming}
-          />
-          {isTranscribing && (
-            <View style={styles.processingRow}>
-              <ActivityIndicator color={PRIMARY} size="small" />
-              <Text style={[styles.processingText, isDark && styles.textDark]}>
-                Transcribing audio…
-              </Text>
-            </View>
-          )}
-        </>
+          </View>
+        )
       )}
 
       {inputMode === 'image' && (
@@ -190,15 +222,17 @@ export default function TranslationScreen() {
         </>
       )}
 
-      {/* ── Vietnamese Text Preview ── */}
+      {/* ── Input Text Preview ── */}
       {(vietnameseText.length > 0 || isProcessingInput) && (
         <View style={[styles.vietnameseCard, isDark && styles.vietnameseCardDark]}>
           <View style={styles.cardHeader}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>VI</Text>
+              <Text style={styles.badgeText}>
+                {inputLanguage.toUpperCase()}
+              </Text>
             </View>
             <Text style={[styles.cardLabel, isDark && styles.textDark]}>
-              Vietnamese text
+              Input text
             </Text>
           </View>
           {isProcessingInput ? (
@@ -215,7 +249,11 @@ export default function TranslationScreen() {
       <ContextInput value={context} onChangeText={setContext} />
 
       {/* ── Language Picker ── */}
-      <LanguagePicker selectedCode={targetLanguage} onSelect={setTargetLanguage} />
+      <LanguagePicker
+        selectedCode={targetLanguage}
+        onSelect={setTargetLanguage}
+        title="Select target language"
+      />
 
       {/* ── Translate Button ── */}
       <TouchableOpacity
@@ -412,5 +450,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 12,
+  },
+  sttNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  sttNoticeDark: {
+    backgroundColor: '#3f2d0d',
+  },
+  sttNoticeText: {
+    flex: 1,
+    color: '#92400e',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  sttNoticeTextDark: {
+    color: '#fcd34d',
   },
 });

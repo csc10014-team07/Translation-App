@@ -11,6 +11,7 @@ import {
   startLiveAudioCapture,
   stopLiveAudioCapture,
 } from '../services/liveAudio';
+import { supportsSpeechToText } from '../constants/languages';
 
 // ──────────────────────────────────────────────
 // Types
@@ -21,6 +22,7 @@ type InputMode = 'text' | 'voice' | 'image';
 export interface TranslationState {
   // ── Input ──
   inputMode: InputMode;
+  inputLanguage: string;
   vietnameseText: string;
   context: string;
   targetLanguage: string;
@@ -43,6 +45,7 @@ export interface TranslationState {
 
   // ── Actions ──
   setInputMode: (mode: InputMode) => void;
+  setInputLanguage: (lang: string) => void;
   setVietnameseText: (text: string) => void;
   setContext: (context: string) => void;
   setTargetLanguage: (lang: string) => void;
@@ -67,6 +70,7 @@ let streamSessionId = 0;
 
 const initialState = {
   inputMode: 'text' as InputMode,
+  inputLanguage: 'vi',
   vietnameseText: '',
   context: '',
   targetLanguage: 'en',
@@ -91,6 +95,13 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
 
   setInputMode: (mode) => set({ inputMode: mode }),
 
+  setInputLanguage: (lang) => {
+    if (!supportsSpeechToText(lang)) {
+      get().stopStreaming();
+    }
+    set({ inputLanguage: lang, error: null });
+  },
+
   setVietnameseText: (text) => set({ vietnameseText: text }),
 
   setContext: (context) => set({ context }),
@@ -98,6 +109,11 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
   setTargetLanguage: (lang) => set({ targetLanguage: lang }),
 
   transcribeAudio: async (audioUri: string) => {
+    const { inputLanguage } = get();
+    if (!supportsSpeechToText(inputLanguage)) {
+      set({ error: 'Speech-to-text is only available for Vietnamese.' });
+      return;
+    }
     set({ isTranscribing: true, error: null });
     try {
       const result = await apiTranscribeAudio(audioUri);
@@ -118,10 +134,17 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
         targetLanguage || undefined,
         context || undefined,
       );
-      set({
+      if (
+        result.detected_language &&
+        !supportsSpeechToText(result.detected_language)
+      ) {
+        get().stopStreaming();
+      }
+      set((state) => ({
         vietnameseText: result.vietnamese_text,
-        translatedText: result.translated_text || get().translatedText,
-      });
+        translatedText: result.translated_text || state.translatedText,
+        inputLanguage: result.detected_language || state.inputLanguage,
+      }));
     } catch (e: unknown) {
       set({ error: extractErrorMessage(e, 'Failed to process image.') });
     } finally {
@@ -130,9 +153,9 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
   },
 
   translate: async () => {
-    const { vietnameseText, targetLanguage, context } = get();
+    const { vietnameseText, inputLanguage, targetLanguage, context } = get();
     if (!vietnameseText.trim()) {
-      set({ error: 'Please enter or record Vietnamese text first.' });
+      set({ error: 'Please enter or record input text first.' });
       return;
     }
     set({ isTranslating: true, error: null, translatedText: '' });
@@ -140,6 +163,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       const result = await apiTranslateText(
         vietnameseText,
         targetLanguage,
+        inputLanguage,
         context || undefined,
       );
       set({
@@ -182,7 +206,15 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
   },
 
   startStreaming: async (customUrl?: string) => {
-    const { targetLanguage, context, referenceAudioUri } = get();
+    const { inputLanguage, targetLanguage, context, referenceAudioUri } = get();
+    if (!supportsSpeechToText(inputLanguage)) {
+      set({
+        error: 'Live speech-to-text is only available for Vietnamese.',
+        isStreaming: false,
+      });
+      return;
+    }
+
     const sessionId = streamSessionId + 1;
     streamSessionId = sessionId;
 
@@ -194,7 +226,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
     set({ isStreaming: true, error: null, translatedText: '' });
 
     const client = new StreamClient({
-      sourceLang: 'vi',
+      sourceLang: inputLanguage,
       targetLang: targetLanguage || 'en',
       customContext: context || '',
       cloneVoice: !!referenceAudioUri,

@@ -79,6 +79,27 @@ def test_translate_endpoints():
     resp_ws_lang = client.post("/api/translate", json={"text": "Hello", "target_language": "  "})
     assert resp_ws_lang.status_code == 422
 
+    # 6. Non-Vietnamese source languages are accepted and forwarded.
+    captured: dict[str, str] = {}
+
+    def capture_translate(**kwargs):
+        captured.update(kwargs)
+        return "Xin chào thế giới", "translategemma-4b"
+
+    with patch.object(TranslationAdapter, "translate_with_engine", side_effect=capture_translate):
+        resp_en = client.post(
+            "/api/translate",
+            json={
+                "text": "Hello world",
+                "source_language": "en",
+                "target_language": "Vietnamese",
+            },
+        )
+    assert resp_en.status_code == 200, f"Error {resp_en.status_code}: {resp_en.text}"
+    assert captured["source_language"] == "en"
+    assert captured["target_language"] == "Vietnamese"
+    assert resp_en.json()["source_language"] == "en"
+
     print("\n🎉 ALL TICKET 02 INTEGRATION TESTS PASSED!")
 
 if __name__ == "__main__":

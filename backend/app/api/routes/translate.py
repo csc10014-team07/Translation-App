@@ -19,17 +19,17 @@ router = APIRouter(prefix="/translate", tags=["Translation"])
 @router.post(
     "",
     response_model=TranslateResponse,
-    summary="Translate Vietnamese text",
+    summary="Translate text between supported languages",
     description=(
-        "Translate Vietnamese text to a target language using Gemma 3 4B. "
-        "An optional *context* field can be supplied to guide style and tone."
+        "Translate text from *source_language* (default: Vietnamese) to *target_language* "
+        "using Gemma 3 4B. An optional *context* field can be supplied to guide style and tone."
     ),
 )
 async def translate_text(
     body: TranslateRequest,
     manager: ModelManager = Depends(dep_model_manager),
 ) -> TranslateResponse:
-    """Translate Vietnamese → target language, optionally guided by context."""
+    """Translate source text → target language, optionally guided by context."""
 
     if not body.text or not body.text.strip():
         raise HTTPException(status_code=422, detail="'text' must not be empty.")
