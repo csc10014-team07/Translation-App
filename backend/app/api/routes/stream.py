@@ -254,10 +254,7 @@ async def _stream_translation_and_tts(
     # ── Step 2: Speech Synthesis ───────────────────────────────────────────
     t2 = time.monotonic()
     tts_adapter = await manager.get_tts()
-    tts_result = await loop.run_in_executor(
-        None,
-        lambda: tts_adapter.synthesize(text=translated_text, language=target_lang),
-    )
+    tts_result = await tts_adapter.synthesize(text=translated_text, language=target_lang)
     audio_np, sample_rate = tts_result[0], tts_result[1]
     tts_ms = (time.monotonic() - t2) * 1000
     vram_tracker.record_warm_inference("tts", tts_ms)
