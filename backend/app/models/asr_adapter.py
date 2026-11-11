@@ -52,12 +52,22 @@ def load_audio_file(audio_path: str | Path, target_sr: int = 16000) -> tuple[np.
             if data.ndim > 1:
                 data = data.mean(axis=1)
             if sr != target_sr:
-                target_len = int(len(data) * target_sr / sr)
-                data = np.interp(
-                    np.linspace(0, len(data), target_len, endpoint=False),
-                    np.arange(len(data)),
-                    data,
-                ).astype(np.float32)
+                try:
+                    import soxr
+
+                    data = soxr.resample(data, sr, target_sr)
+                except ImportError:
+                    try:
+                        import librosa
+
+                        data = librosa.resample(data, orig_sr=sr, target_sr=target_sr)
+                    except ImportError:
+                        target_len = int(len(data) * target_sr / sr)
+                        data = np.interp(
+                            np.linspace(0, len(data), target_len, endpoint=False),
+                            np.arange(len(data)),
+                            data,
+                        ).astype(np.float32)
             audio_data = data.astype(np.float32)
         except Exception as sf_err:
             raise ValueError(f"Unreadable audio content: {sf_err}") from sf_err

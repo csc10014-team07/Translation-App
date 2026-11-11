@@ -112,6 +112,8 @@ async def transcribe_audio(
             word_timestamps=result.get("word_timestamps") or None,
         )
 
+    except HTTPException:
+        raise
     except FileNotFoundError as exc:
         logger.error("Temp audio file not found: %s", exc)
         raise HTTPException(status_code=500, detail="Internal server error during ASR.") from exc
