@@ -64,7 +64,7 @@ class OCRAdapter:
         """
         self.load()
         if self._engine is None:
-            return "", "en", []
+            raise RuntimeError("RapidOCR engine is not available. Please verify rapidocr-onnxruntime is installed.")
 
         temp_path = None
         if isinstance(image_input, (bytes, bytearray)):
