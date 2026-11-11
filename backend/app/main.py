@@ -87,6 +87,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # ── API Key Middleware (enforced only when API_KEY is set) ──────────────
+    @application.middleware("http")
+    async def api_key_middleware(request, call_next):
+        if settings.API_KEY:
+            if request.url.path not in ("/health", "/docs", "/redoc", "/openapi.json"):
+                api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+                if api_key != settings.API_KEY:
+                    from starlette.responses import JSONResponse
+                    return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+        return await call_next(request)
+
     # ── Routers ────────────────────────────────────────────────────────────
     prefix = settings.API_PREFIX
     application.include_router(asr.router, prefix=prefix)

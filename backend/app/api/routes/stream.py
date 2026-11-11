@@ -279,6 +279,12 @@ async def _stream_translation_and_tts(
 @router.websocket("/ws/stream")
 async def websocket_stream_endpoint(websocket: WebSocket) -> None:
     """Full-duplex real-time streaming endpoint."""
+    if settings.API_KEY:
+        api_key = websocket.query_params.get("api_key") or websocket.headers.get("x-api-key")
+        if api_key != settings.API_KEY:
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+
     await websocket.accept()
     logger.info("Client connected to /ws/stream")
 

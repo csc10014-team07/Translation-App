@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    API_KEY: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
