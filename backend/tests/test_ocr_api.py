@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+from unittest.mock import patch
 
 from app.main import app
 from PIL import Image, ImageDraw
@@ -24,7 +25,8 @@ def test_ocr_two_stage_vietnamese_menu():
 
     files = {"image": ("menu.png", buf.getvalue(), "image/png")}
     data = {"target_language": "en", "context_preset": "Travel"}
-    resp = client.post("/api/ocr", files=files, data=data)
+    with patch("app.models.translation_adapter.TranslationAdapter.translate", return_value="Coffee with milk and ice"):
+        resp = client.post("/api/ocr", files=files, data=data)
 
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
     body = resp.json()
@@ -59,7 +61,8 @@ def test_ocr_two_stage_english_notice():
 
     files = {"image": ("notice.png", buf.getvalue(), "image/png")}
     data = {"target_language": "vi", "context_preset": "Technical"}
-    resp = client.post("/api/ocr", files=files, data=data)
+    with patch("app.models.translation_adapter.TranslationAdapter.translate", return_value="Cảnh báo: Bảo trì máy chủ"):
+        resp = client.post("/api/ocr", files=files, data=data)
 
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
     body = resp.json()
