@@ -7,6 +7,10 @@ import {
   saveBase64Audio,
 } from '../services/api';
 import { StreamClient } from '../services/stream';
+import {
+  startLiveAudioCapture,
+  stopLiveAudioCapture,
+} from '../services/liveAudio';
 
 // ──────────────────────────────────────────────
 // Types
@@ -59,6 +63,7 @@ export interface TranslationState {
 // ──────────────────────────────────────────────
 
 let activeStreamClient: StreamClient | null = null;
+let streamSessionId = 0;
 
 const initialState = {
   inputMode: 'text' as InputMode,
@@ -178,42 +183,100 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
 
   startStreaming: async (customUrl?: string) => {
     const { targetLanguage, context, referenceAudioUri } = get();
+    const sessionId = streamSessionId + 1;
+    streamSessionId = sessionId;
+
+    stopLiveAudioCapture();
     if (activeStreamClient) {
       activeStreamClient.disconnect();
       activeStreamClient = null;
     }
     set({ isStreaming: true, error: null, translatedText: '' });
+
     const client = new StreamClient({
       sourceLang: 'vi',
       targetLang: targetLanguage || 'en',
       customContext: context || '',
       cloneVoice: !!referenceAudioUri,
-      onAsrInterim: (text) => set({ vietnameseText: text }),
-      onAsrFinal: (text) => set({ vietnameseText: text }),
-      onTransDelta: (token) => set((s) => ({ translatedText: s.translatedText + token })),
-      onTransFinal: (text) => set({ translatedText: text }),
+      onAsrInterim: (text) => {
+        if (sessionId === streamSessionId) set({ vietnameseText: text });
+      },
+      onAsrFinal: (text) => {
+        if (sessionId === streamSessionId) set({ vietnameseText: text });
+      },
+      onTransDelta: (token) => {
+        if (sessionId === streamSessionId) {
+          set((s) => ({ translatedText: s.translatedText + token }));
+        }
+      },
+      onTransFinal: (text) => {
+        if (sessionId === streamSessionId) set({ translatedText: text });
+      },
       onAudioChunk: async (b64) => {
+        if (sessionId !== streamSessionId) return;
         try {
           const uri = await saveBase64Audio(b64, 'wav');
-          set({ synthesizedAudioUri: uri });
+          if (sessionId === streamSessionId) set({ synthesizedAudioUri: uri });
         } catch {
           // ignore cache write error
         }
       },
-      onError: (err) => set({ error: err, isStreaming: false }),
-      onClose: () => set({ isStreaming: false }),
+      onError: (err) => {
+        if (sessionId !== streamSessionId) return;
+        streamSessionId += 1;
+        stopLiveAudioCapture();
+        client.disconnect();
+        set({ error: err, isStreaming: false });
+      },
+      onClose: () => {
+        if (sessionId !== streamSessionId) return;
+        stopLiveAudioCapture();
+        set({ isStreaming: false });
+      },
     });
+
     try {
       await client.connect(customUrl);
+
+      if (sessionId !== streamSessionId || !get().isStreaming) {
+        client.disconnect();
+        return;
+      }
+
+      await startLiveAudioCapture((chunk) => {
+        if (sessionId === streamSessionId) client.sendAudioChunk(chunk);
+      });
+
+      if (sessionId !== streamSessionId) {
+        // A newer session owns the microphone now; only drop the old socket.
+        client.disconnect();
+        return;
+      }
+
+      if (!get().isStreaming) {
+        stopLiveAudioCapture();
+        client.disconnect();
+        return;
+      }
+
       activeStreamClient = client;
     } catch (e: unknown) {
-      set({ error: extractErrorMessage(e, 'Failed to connect streaming WebSocket.'), isStreaming: false });
+      client.disconnect();
+      if (sessionId !== streamSessionId) return;
+      streamSessionId += 1;
+      stopLiveAudioCapture();
+      set({
+        error: extractErrorMessage(e, 'Failed to start live microphone streaming.'),
+        isStreaming: false,
+      });
     }
   },
 
   stopStreaming: () => {
+    streamSessionId += 1;
+    stopLiveAudioCapture();
     if (activeStreamClient) {
-      activeStreamClient.disconnect();
+      activeStreamClient.finish();
       activeStreamClient = null;
     }
     set({ isStreaming: false });
@@ -228,6 +291,8 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
   clearError: () => set({ error: null }),
 
   reset: () => {
+    streamSessionId += 1;
+    stopLiveAudioCapture();
     if (activeStreamClient) {
       activeStreamClient.disconnect();
       activeStreamClient = null;

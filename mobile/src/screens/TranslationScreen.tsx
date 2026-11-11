@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  AppState,
   useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslationStore } from '../store/translationStore';
+import { isLiveAudioSupported } from '../services/liveAudio';
 import InputModeSelector from '../components/InputModeSelector';
 import VoiceRecorder from '../components/VoiceRecorder';
 import ImagePickerButton from '../components/ImagePickerButton';
@@ -66,6 +68,16 @@ export default function TranslationScreen() {
     },
     [processImage],
   );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') stopStreaming();
+    });
+    return () => {
+      subscription.remove();
+      stopStreaming();
+    };
+  }, [stopStreaming]);
 
   const isProcessingInput = isTranscribing || isOcrProcessing;
 
@@ -129,15 +141,20 @@ export default function TranslationScreen() {
                   { color: isStreaming ? '#fff' : PRIMARY },
                 ]}
               >
-                {isStreaming ? 'Stop Live WebSocket Stream' : '⚡ Start Live WebSocket Stream'}
+                {isStreaming ? 'Stop Live Mic Stream' : '⚡ Start Live Mic Stream'}
               </Text>
             </TouchableOpacity>
           </View>
+          {!isLiveAudioSupported() && (
+            <Text style={[styles.streamHint, isDark && styles.textDark]}>
+              Live mic requires a development build (not Expo Go).
+            </Text>
+          )}
           {isStreaming && (
             <View style={styles.processingRow}>
               <ActivityIndicator color={PRIMARY} size="small" />
               <Text style={[styles.processingText, isDark && styles.textDark]}>
-                Streaming live audio & tokens over /ws/stream…
+                Streaming microphone audio & tokens over /ws/stream…
               </Text>
             </View>
           )}
@@ -389,5 +406,11 @@ const styles = StyleSheet.create({
   streamButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  streamHint: {
+    color: '#777',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 12,
   },
 });

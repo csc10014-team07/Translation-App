@@ -167,6 +167,10 @@ python start_app.py
    ```
    *(Or standard `npx expo start` if on the same Wi-Fi network).*
 
+   > **Live microphone streaming** uses the native `react-native-live-audio-stream`
+   > PCM module, so it requires a development build (`npx expo run:android` or
+   > `npx expo run:ios`). The rest of the app still works in Expo Go.
+
 3. **Scan the QR Code**:
    - **Android**: Open the **Expo Go** app and tap "Scan QR Code".
    - **iOS**: Open the native **Camera** app and tap the Expo link banner.

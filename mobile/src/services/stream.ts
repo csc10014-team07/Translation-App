@@ -4,6 +4,8 @@
  */
 import { getStreamWebSocketUrl } from './api';
 
+const STOP_DRAIN_TIMEOUT_MS = 5000;
+
 export interface StreamEvent {
   event: 'asr_interim' | 'asr_final' | 'trans_delta' | 'trans_final' | 'tts_audio' | 'error';
   text?: string;
@@ -32,6 +34,7 @@ export interface StreamOptions {
 export class StreamClient {
   private ws: WebSocket | null = null;
   private options: StreamOptions;
+  private stopTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: StreamOptions = {}) {
     this.options = options;
@@ -68,6 +71,10 @@ export class StreamClient {
           try {
             if (typeof event.data === 'string') {
               const data = JSON.parse(event.data);
+              if (data.type === 'stopped') {
+                this.disconnect();
+                return;
+              }
               switch (data.event) {
                 case 'asr_interim':
                   this.options.onAsrInterim?.(data.text);
@@ -115,6 +122,16 @@ export class StreamClient {
     });
   }
 
+  finish(timeoutMs: number = STOP_DRAIN_TIMEOUT_MS): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'stop' }));
+      if (this.stopTimer) clearTimeout(this.stopTimer);
+      this.stopTimer = setTimeout(() => this.disconnect(), timeoutMs);
+      return;
+    }
+    this.disconnect();
+  }
+
   sendAudioChunk(chunk: ArrayBuffer | Uint8Array): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(chunk);
@@ -133,6 +150,10 @@ export class StreamClient {
   }
 
   disconnect(): void {
+    if (this.stopTimer) {
+      clearTimeout(this.stopTimer);
+      this.stopTimer = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
