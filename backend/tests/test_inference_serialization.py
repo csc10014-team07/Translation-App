@@ -16,38 +16,47 @@ import types
 from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
-# Lightweight sys.modules stubs for packages not installed in the test env.
-# Must be done before any app import that transitively pulls these packages.
+# Fallback stubs ONLY when heavy packages are not installed in the test env.
 # ---------------------------------------------------------------------------
 
-def _stub_module(name: str, **attrs: object) -> types.ModuleType:
-    mod = types.ModuleType(name)
-    for k, v in attrs.items():
-        setattr(mod, k, v)
-    sys.modules.setdefault(name, mod)
-    return sys.modules[name]
+try:
+    import torch
+except ImportError:
+    torch = types.ModuleType("torch")
+    torch.cuda = MagicMock()
+    torch.cuda.is_available = MagicMock(return_value=False)
+    torch.cuda.empty_cache = MagicMock()
+    torch.tensor = MagicMock()
+    sys.modules["torch"] = torch
 
+try:
+    import transformers
+except ImportError:
+    transformers = types.ModuleType("transformers")
+    transformers.pipeline = MagicMock()
+    sys.modules["transformers"] = transformers
 
-# torch stub (needed by app.core.config and app.models.asr_adapter)
-_torch = _stub_module("torch")
-_torch.cuda = MagicMock()  # type: ignore[attr-defined]
-_torch.cuda.is_available = MagicMock(return_value=False)  # type: ignore[attr-defined]
-_torch.cuda.empty_cache = MagicMock()  # type: ignore[attr-defined]
-_torch.tensor = MagicMock()  # type: ignore[attr-defined]
+try:
+    import numpy
+except ImportError:
+    numpy = types.ModuleType("numpy")
+    numpy.ndarray = type("ndarray", (), {})
+    sys.modules["numpy"] = numpy
 
-# transformers stub (needed by app.models.asr_adapter top-level import)
-_stub_module("transformers", pipeline=MagicMock())
+try:
+    import soundfile
+except ImportError:
+    soundfile = types.ModuleType("soundfile")
+    sys.modules["soundfile"] = soundfile
 
-# numpy stub (needed by app.models.asr_adapter top-level import)
-_np = _stub_module("numpy")
-_np.ndarray = type("ndarray", (), {})  # type: ignore[attr-defined]
-
-# soundfile stub
-_stub_module("soundfile")
-
-# pydantic_settings stub (needed by app.core.config)
-_base = type("BaseSettings", (), {"__init_subclass__": classmethod(lambda cls, **kw: None)})
-_stub_module("pydantic_settings", BaseSettings=_base, SettingsConfigDict=MagicMock())
+try:
+    import pydantic_settings
+except ImportError:
+    pydantic_settings = types.ModuleType("pydantic_settings")
+    _base = type("BaseSettings", (), {"__init_subclass__": classmethod(lambda cls, **kw: None)})
+    pydantic_settings.BaseSettings = _base
+    pydantic_settings.SettingsConfigDict = MagicMock()
+    sys.modules["pydantic_settings"] = pydantic_settings
 
 # ---------------------------------------------------------------------------
 # Now safe to import app modules
@@ -90,8 +99,7 @@ class TestTranslationAdapterLock:
         adapter._llm = counting_llm
 
         def call_translate():
-            with patch.object(adapter, "_query_ollama", return_value=None), \
-                 patch.object(adapter, "load"):
+            with patch.object(adapter, "load"):
                 adapter.translate(text="Xin chào", target_language="en")
 
         t1 = threading.Thread(target=call_translate)

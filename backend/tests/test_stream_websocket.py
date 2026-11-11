@@ -13,10 +13,7 @@ so the suite runs without GPU or downloaded model weights.
 """
 from __future__ import annotations
 
-import asyncio
-import sys
 import threading
-import types
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock
@@ -29,94 +26,7 @@ soundfile = pytest.importorskip("soundfile")
 numpy = pytest.importorskip("numpy")
 soundfile = pytest.importorskip("soundfile")
 
-# ---------------------------------------------------------------------------
-# Lightweight sys.modules stubs — must come before any app import.
-# ---------------------------------------------------------------------------
-
-
-def _stub(name: str, **attrs: object) -> types.ModuleType:
-    mod = types.ModuleType(name)
-    for k, v in attrs.items():
-        setattr(mod, k, v)
-    sys.modules.setdefault(name, mod)
-    return sys.modules[name]
-
-
-# torch — needed by app.core.config and app.core.vram_monitor
-_torch = _stub("torch")
-_cuda = MagicMock()
-_cuda.is_available = MagicMock(return_value=False)
-_torch.cuda = _cuda  # type: ignore[attr-defined]
-_torch.tensor = MagicMock()  # type: ignore[attr-defined]
-
-# pydantic_settings — needed by app.core.config
-_BaseSettings = type(
-    "BaseSettings",
-    (),
-    {
-        "__init_subclass__": classmethod(lambda cls, **kw: None),
-        "__init__": lambda self, **kw: None,
-    },
-)
-_stub("pydantic_settings", BaseSettings=_BaseSettings, SettingsConfigDict=MagicMock())
-
-# numpy — needed by stream.py and asr_adapter
-
-# soundfile — needed by stream.py
-
-# transformers — needed by asr_adapter
-_stub("transformers", pipeline=MagicMock())
-
-# rapidocr_onnxruntime — needed by ocr_adapter
-_stub("rapidocr_onnxruntime", RapidOCR=MagicMock())
-
-# PIL — needed by ocr route (not imported here, but guard against leakage)
-_stub("PIL", Image=MagicMock())
-
-# llama_cpp — needed by translation_adapter
-_stub("llama_cpp", Llama=MagicMock())
-
-# deep_translator — needed by translation_adapter
-_stub("deep_translator", MyMemoryTranslator=MagicMock())
-
-# aiofiles — needed by asr route
-_stub("aiofiles")
-
-# ---------------------------------------------------------------------------
-# Patch app.core.config.settings before importing anything from app.*
-# ---------------------------------------------------------------------------
-
-
-# Build a real-enough Settings object without pydantic machinery.
-class _FakeSettings:
-    MAX_AUDIO_DURATION_S: float = 30.0
-    DEVICE: str = "cpu"
-    GEMMA_GGUF_PATH: str = "/nonexistent"
-    GEMMA_N_CTX: int = 2048
-    GEMMA_N_GPU_LAYERS: int = 0
-    PHOASR_MODEL_ID: str = "fake/model"
-    MODELS_DIR: str = "./models"
-    API_PREFIX: str = "/api"
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
-
-    def effective_device(self) -> str:
-        return "cpu"
-
-
-_fake_settings = _FakeSettings()
-
-# Patch config module before it's imported.
-_config_mod = _stub("app.core.config", settings=_fake_settings)
-
-# ---------------------------------------------------------------------------
-# Now safe to import app.core.vram_monitor and app.api.routes.stream
-# ---------------------------------------------------------------------------
-
-# app.core.vram_monitor uses torch directly — patch it.
-import app.core.vram_monitor as _vram_mod  # noqa: E402
-
-_vram_mod.vram_tracker = MagicMock()  # replace with a no-op tracker
+import app.api.routes.stream as stream_mod
 
 # ---------------------------------------------------------------------------
 # Build fake model manager & adapters for injection.
@@ -127,7 +37,7 @@ def _make_fake_manager(
     asr_fn: Any = None,
     trans_fn: Any = None,
     tts_fn: Any = None,
-) -> MagicMock:
+) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock]:
     """Return a fake ModelManager whose get_* coroutines return fake adapters."""
 
     async def _fake_coro(value: Any) -> Any:
@@ -158,17 +68,15 @@ def _make_fake_manager(
     else:
         import numpy as np
 
-        tts_adapter.synthesize = lambda text, language: (
-            np.zeros(16000, dtype=np.float32),
-            16000,
-        )
+        async def _default_synthesize(text: str, language: str) -> tuple[np.ndarray, int]:
+            return np.zeros(16000, dtype=np.float32), 16000
+
+        tts_adapter.synthesize = _default_synthesize
 
     manager = MagicMock()
-    manager.get_asr = MagicMock(side_effect=lambda: asyncio.coroutine(lambda: asr_adapter)())
-    manager.get_translation = MagicMock(
-        side_effect=lambda: asyncio.coroutine(lambda: trans_adapter)()
-    )
-    manager.get_tts = MagicMock(side_effect=lambda: asyncio.coroutine(lambda: tts_adapter)())
+    manager.get_asr = MagicMock(side_effect=lambda: _fake_coro(asr_adapter))
+    manager.get_translation = MagicMock(side_effect=lambda: _fake_coro(trans_adapter))
+    manager.get_tts = MagicMock(side_effect=lambda: _fake_coro(tts_adapter))
 
     return manager, asr_adapter, trans_adapter, tts_adapter
 
@@ -179,7 +87,6 @@ def _make_fake_manager(
 
 
 def _make_test_app(manager: MagicMock) -> Any:
-    import app.api.routes.stream as stream_mod
     from fastapi import FastAPI
 
     test_app = FastAPI()
