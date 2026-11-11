@@ -145,8 +145,8 @@ class TranslationAdapter:
 
         self.load()
         if self._llm is None:
-            if settings.ALLOW_ONLINE_FALLBACK:
-                logger.warning("TranslateGemma model not loaded, but online fallback is disabled")
+            if not settings.ALLOW_ONLINE_FALLBACK:
+                logger.warning("TranslateGemma model not loaded and online fallback is disabled")
             raise RuntimeError("TranslateGemma model is not loaded. Please verify GEMMA_GGUF_PATH.")
 
         prompt = self.build_prompt(
@@ -173,7 +173,7 @@ class TranslationAdapter:
             raise RuntimeError("TranslateGemma returned empty response")
         except Exception as e:
             logger.warning("Gemma inference error: %s", e)
-            if settings.ALLOW_ONLINE_FALLBACK:
+            if not settings.ALLOW_ONLINE_FALLBACK:
                 logger.warning("Online fallback is disabled (ALLOW_ONLINE_FALLBACK=false)")
             raise RuntimeError(f"Translation failed: {e}") from e
 
