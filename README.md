@@ -1,6 +1,8 @@
 # Context-Aware Multimodal Translation System
 
-An end-to-end, privacy-preserving AI translation platform featuring Vietnamese speech recognition (PhoASR), two-stage image OCR translation (RapidOCR + TranslateGemma-2B), hybrid TTS speech synthesis with CPU voice cloning (Pocket TTS / Edge-TTS), and real-time streaming WebSockets over an automated Cloudflare Quick Tunnel to a cross-platform mobile app (React Native Expo).
+An end-to-end AI translation platform featuring Vietnamese speech recognition (PhoASR), two-stage image OCR translation (RapidOCR + TranslateGemma), hybrid TTS speech synthesis with CPU voice cloning (Pocket TTS / Edge-TTS), and real-time streaming WebSockets over an automated Cloudflare Quick Tunnel to a cross-platform mobile app (React Native Expo).
+
+> **Note**: Edge-TTS sends text to Microsoft's cloud service for synthesis. The tunnel connects through Cloudflare's network.
 
 ---
 
@@ -45,8 +47,8 @@ graph TD
 ## ⚡ Key Highlights
 
 - **Context-Aware Translation**: Steers translations using situational context presets (General, Medical, Technical, Business, Casual) and custom prompts to disambiguate pronouns and domain-specific terminology.
-- **VRAM Guardrails (< 5,000MB)**: Efficient multi-model orchestration on consumer GPUs (e.g., RTX 5060 8GB) with automatic CPU offloading for TTS and OCR.
-- **Hybrid Voice Cloning**: Rapid zero-shot voice cloning with Pocket TTS on CPU (RTF 0.41x) using reference audio, plus low-latency cloud fallback via Edge-TTS.
+- **VRAM Guardrails**: Efficient multi-model orchestration on consumer GPUs with automatic CPU offloading for TTS and OCR.
+- **Hybrid Voice Cloning**: Rapid zero-shot voice cloning with Pocket TTS on CPU using reference audio, plus cloud-based Edge-TTS for additional languages.
 - **Zero-Config Remote Connectivity**: Built-in Cloudflare Quick Tunnel automatically exposes the local backend over public HTTPS and WSS, allowing any smartphone on 4G LTE or cellular data to connect instantly.
 
 ---
@@ -83,13 +85,34 @@ bash setup-wizard.sh
    cd Translation-App
    ```
 
-2. **Install backend dependencies**:
+2. **Install backend dependencies** (use a virtual environment):
    ```bash
    cd backend
+   python -m venv venv
+   source venv/bin/activate  # Linux/macOS
+   # or: venv\Scripts\activate  # Windows
    pip install -r requirements.txt
    ```
 
-3. **Run code quality checks and tests**:
+3. **Download models**:
+   - PhoASR: `Qualcomm-AI-Research/PhoASR-whisper-small` (auto-downloaded by transformers)
+   - TranslateGemma: Download `translategemma-4b-it.Q5_K_M.gguf` and place at `./models/gemma/`
+   - Set `GEMMA_GGUF_PATH` in `.env` to point to your model file.
+
+4. **Configure environment variables** (see `.env.example`):
+   ```bash
+   cp .env.example .env
+   # Edit .env with your settings
+   ```
+   
+   **Available settings:**
+   - `API_KEY`: Optional. When set, all API routes require `X-API-Key` header.
+   - `ALLOW_ONLINE_FALLBACK=false`: Disable online translation fallback.
+   - `EDGE_TTS_ENABLED=true`: Enable Edge-TTS for non-Pocket TTS languages.
+   - `MAX_AUDIO_DURATION_S=30.0`: Maximum audio duration for ASR.
+   - `DEVICE=cuda`: Target device for inference (cuda or cpu).
+
+5. **Run code quality checks and tests**:
    ```bash
    # Run Ruff code quality & lint checks
    python scripts/check.py

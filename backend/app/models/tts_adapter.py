@@ -14,8 +14,17 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Pocket TTS supported languages (verified from package)
-POCKET_TTS_LANGUAGES = {"en", "fr", "de", "es", "pt", "it", "english", "french", "german", "spanish", "portuguese", "italian"}
+# Pocket TTS supported languages mapping (short code -> canonical model name)
+POCKET_TTS_LANG_MAP: dict[str, str] = {
+    "en": "english", "english": "english",
+    "fr": "french", "french": "french",
+    "de": "german", "german": "german",
+    "es": "spanish", "spanish": "spanish",
+    "pt": "portuguese", "portuguese": "portuguese",
+    "it": "italian", "italian": "italian",
+    "nl": "dutch", "dutch": "dutch",
+}
+POCKET_TTS_LANGUAGES = set(POCKET_TTS_LANG_MAP.keys())
 
 # Edge TTS language to voice mapping
 EDGE_VOICES_FEMALE = {
@@ -65,28 +74,32 @@ class TTSAdapter:
         self._pocket_models: dict[str, Any] = {}
         self._pocket_load_locks: dict[str, threading.Lock] = {}
         self._pocket_inference_lock = threading.Lock()
-        # Pre-create locks for all Pocket TTS languages
-        for lang in POCKET_TTS_LANGUAGES:
+        # Pre-create locks for all Pocket TTS canonical languages
+        for lang in set(POCKET_TTS_LANG_MAP.values()):
             self._pocket_load_locks[lang] = threading.Lock()
 
     def _load_pocket_tts(self, language: str) -> Any:
         """Load Pocket TTS model for a specific language."""
         lang_key = language.strip().lower()
-        if lang_key not in self._pocket_models:
-            lock = self._pocket_load_locks.get(lang_key, threading.Lock())
+        canonical_lang = POCKET_TTS_LANG_MAP.get(lang_key, lang_key)
+        if canonical_lang not in self._pocket_models:
+            lock = self._pocket_load_locks.get(canonical_lang)
+            if lock is None:
+                lock = threading.Lock()
+                self._pocket_load_locks[canonical_lang] = lock
             with lock:
                 # Double-check after acquiring lock
-                if lang_key not in self._pocket_models:
+                if canonical_lang not in self._pocket_models:
                     try:
                         from pocket_tts import TTSModel
-                        logger.info("Loading Pocket TTS model for %s on CPU (0MB VRAM)...", lang_key)
-                        model = TTSModel.load_model(language=lang_key)
-                        self._pocket_models[lang_key] = model
-                        logger.info("Pocket TTS loaded successfully for %s on CPU.", lang_key)
+                        logger.info("Loading Pocket TTS model for %s on CPU (0MB VRAM)...", canonical_lang)
+                        model = TTSModel.load_model(language=canonical_lang)
+                        self._pocket_models[canonical_lang] = model
+                        logger.info("Pocket TTS loaded successfully for %s on CPU.", canonical_lang)
                     except Exception as e:  # noqa: BLE001
-                        logger.warning("Could not load Pocket TTS for %s: %s", lang_key, e)
-                        self._pocket_models[lang_key] = None
-        return self._pocket_models.get(lang_key)
+                        logger.warning("Could not load Pocket TTS for %s: %s", canonical_lang, e)
+                        self._pocket_models[canonical_lang] = None
+        return self._pocket_models.get(canonical_lang)
 
     def _get_pocket_voice_state(self, model: Any, reference_audio_path: str | Path | None) -> tuple[dict[str, Any], str]:
         """Get the voice state for Pocket TTS, either from reference audio or default."""
@@ -211,9 +224,10 @@ class TTSAdapter:
         if preferred_engine:
             preferred_lower = preferred_engine.lower()
             if preferred_lower == "pocket_tts":
-                if lang_lower not in POCKET_TTS_LANGUAGES:
+                canonical_lang = POCKET_TTS_LANG_MAP.get(lang_lower)
+                if not canonical_lang:
                     raise ValueError(f"Pocket TTS does not support language: {language}")
-                return self._synthesize_pocket_tts(text, language, reference_audio_path, voice_style)
+                return self._synthesize_pocket_tts(text, canonical_lang, reference_audio_path, voice_style)
             elif preferred_lower == "edge_tts":
                 if not settings.EDGE_TTS_ENABLED:
                     raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
@@ -230,11 +244,12 @@ class TTSAdapter:
             return await self._synthesize_edge_tts(text, language, voice_style)
         
         # Pocket TTS languages: use Pocket TTS if reference audio is provided
-        if lang_lower in POCKET_TTS_LANGUAGES:
+        canonical_lang = POCKET_TTS_LANG_MAP.get(lang_lower)
+        if canonical_lang:
             if reference_audio_path is not None:
                 ref_path = Path(reference_audio_path) if reference_audio_path else None
                 if ref_path is not None and ref_path.exists():
-                    return self._synthesize_pocket_tts(text, language, reference_audio_path, voice_style)
+                    return self._synthesize_pocket_tts(text, canonical_lang, reference_audio_path, voice_style)
         
         # Default: use Edge-TTS for all other cases
         if not settings.EDGE_TTS_ENABLED:
