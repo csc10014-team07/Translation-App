@@ -109,22 +109,26 @@ class ASRAdapter:
             )
             logger.info("PhoASR ready.")
 
-    def transcribe(self, audio_path: str | Path) -> dict[str, Any]:
-        """
-        Transcribe audio file into Vietnamese text.
+    def transcribe_array(
+        self,
+        audio_data: np.ndarray,
+        duration: float | None = None,
+    ) -> dict[str, Any]:
+        """Transcribe already-decoded mono float32 audio at 16 kHz.
 
-        Returns:
-            dict with 'text', 'language', and 'duration'.
+        Avoids re-reading/re-decoding the audio when the caller already holds
+        the samples in memory (e.g. raw PCM from the streaming endpoint).
         """
         self.load()
-        data, duration = load_audio_file(audio_path, target_sr=16000)
+        if duration is None:
+            duration = round(float(len(audio_data) / 16000), 2)
 
         generate_kwargs = {
             "task": "transcribe",
             "language": "vi",
         }
         with self._lock:
-            res = self._pipe(data, generate_kwargs=generate_kwargs)
+            res = self._pipe(audio_data, generate_kwargs=generate_kwargs)
         text = res.get("text", "").strip()
 
         return {
@@ -133,6 +137,16 @@ class ASRAdapter:
             "duration": duration,
             "word_timestamps": None,
         }
+
+    def transcribe(self, audio_path: str | Path) -> dict[str, Any]:
+        """
+        Transcribe audio file into Vietnamese text.
+
+        Returns:
+            dict with 'text', 'language', and 'duration'.
+        """
+        data, duration = load_audio_file(audio_path, target_sr=16000)
+        return self.transcribe_array(data, duration)
 
     def unload(self) -> None:
         """Free pipeline memory."""

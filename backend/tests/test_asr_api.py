@@ -40,10 +40,10 @@ def test_asr_endpoint():
         audio_filename = "valid.wav"
         audio_content_type = "audio/wav"
 
-    def fake_transcribe(audio_file):
+    def fake_transcribe(audio_data, duration=None):
         return {"text": "Xin chào thế giới", "language": "vi", "duration": 1.0}
 
-    with patch.object(ASRAdapter, "transcribe", side_effect=fake_transcribe):
+    with patch.object(ASRAdapter, "transcribe_array", side_effect=fake_transcribe):
         files = {"audio": (audio_filename, audio_bytes, audio_content_type)}
         resp = client.post("/api/asr", files=files)
         assert resp.status_code == 200, f"Error {resp.status_code}: {resp.text}"

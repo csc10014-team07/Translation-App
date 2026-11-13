@@ -99,7 +99,7 @@ async def transcribe_audio(
         asr = await manager.get_asr()
         t0 = time.monotonic()
         result: dict = await asyncio.get_event_loop().run_in_executor(
-            None, asr.transcribe, tmp_path
+            None, asr.transcribe_array, audio_data, duration
         )
         elapsed_ms = (time.monotonic() - t0) * 1000
         vram_tracker.record_warm_inference("phoasr", elapsed_ms)
