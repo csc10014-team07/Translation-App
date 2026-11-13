@@ -63,6 +63,21 @@ def test_build_prompt_with_presets_and_custom_context():
     assert "General natural translation" in prompt_empty
 
 
+def test_build_prompt_preserves_unmatched_free_text_context():
+    """Free text passed via context_preset must not be silently dropped."""
+    adapter = TranslationAdapter()
+
+    prompt = adapter.build_prompt(
+        text="Cho tôi xem thực đơn",
+        source_lang="vi",
+        target_lang="en",
+        context_preset="Hội thoại nhà hàng",
+    )
+
+    assert "Hội thoại nhà hàng" in prompt
+    assert "General natural translation" not in prompt
+
+
 def test_fallback_tier1_translategemma():
     """Verify Tier 1 uses TranslateGemma 4B when _llm is available."""
     adapter = TranslationAdapter()

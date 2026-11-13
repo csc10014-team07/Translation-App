@@ -99,12 +99,17 @@ class TranslationAdapter:
 
         # Match preset if given
         preset_info = ""
+        free_context = ""
         preset_candidate = (context_preset or "").strip()
         if preset_candidate:
             for k, v in CONTEXT_PRESETS.items():
                 if k.lower() == preset_candidate.lower() or k.lower() in preset_candidate.lower():
                     preset_info = v
                     break
+            if not preset_info:
+                # Preserve unknown preset values as free-form context instead of
+                # silently dropping them (callers may send free text here).
+                free_context = preset_candidate
         elif context:
             for k, v in CONTEXT_PRESETS.items():
                 if k.lower() in context.lower():
@@ -116,8 +121,12 @@ class TranslationAdapter:
             parts.append(preset_info)
         if custom_context and custom_context.strip():
             parts.append(custom_context.strip())
+        if free_context:
+            parts.append(free_context)
         if context and context.strip() and not preset_info:
-            parts.append(context.strip())
+            extra = context.strip()
+            if extra not in free_context:
+                parts.append(extra)
 
         combined_context = " | ".join(parts).strip()
         if not combined_context:

@@ -132,6 +132,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       const result = await apiOcrImage(
         imageUri,
         targetLanguage || undefined,
+        undefined,
         context || undefined,
       );
       if (
