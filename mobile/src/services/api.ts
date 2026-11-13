@@ -230,33 +230,61 @@ export async function checkHealth(): Promise<HealthResponse> {
  * Decode a base64 audio string returned by TTS and save it to a temp file.
  * Returns the local URI of the saved file.
  */
+const TTS_CACHE_PREFIX = 'tts_output_';
+const TTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function cleanupStaleTtsFiles(
+  cacheDir: string,
+  currentUri: string,
+  ext: string,
+): Promise<void> {
+  const files = await FileSystem.readDirectoryAsync(cacheDir);
+  const now = Date.now();
+  await Promise.all(
+    files
+      .filter(
+        (file) => file.startsWith(TTS_CACHE_PREFIX) && file.endsWith(`.${ext}`),
+      )
+      .map(async (file) => {
+        const fileUri = `${cacheDir}${file}`;
+        // Never delete the file that was just written (it may be playing).
+        if (fileUri === currentUri) return;
+        try {
+          const info = await FileSystem.getInfoAsync(fileUri);
+          if (!info.exists) return;
+          const ageMs = now - info.modificationTime * 1000;
+          if (ageMs > TTS_CACHE_TTL_MS) {
+            await FileSystem.deleteAsync(fileUri, { idempotent: true });
+          }
+        } catch {
+          // Ignore per-file cleanup errors
+        }
+      }),
+  );
+}
+
 export async function saveBase64Audio(
   base64: string,
   format: string,
 ): Promise<string> {
   const ext = format ?? 'wav';
   const timestamp = Date.now();
-  const uri = `${FileSystem.cacheDirectory}tts_output_${timestamp}.${ext}`;
+  const unique = Math.random().toString(36).slice(2, 8);
+  const uri = `${FileSystem.cacheDirectory}tts_output_${timestamp}_${unique}.${ext}`;
   await FileSystem.writeAsStringAsync(uri, base64, {
     encoding: FileSystem.EncodingType.Base64,
   });
-  
-  // Cleanup: delete old TTS files (keep only the current one)
+
+  // Cleanup: only remove stale files. Young files are kept because a player
+  // (expo-av) may still be streaming the previous chunk.
   try {
     const cacheDir = FileSystem.cacheDirectory;
     if (cacheDir) {
-      const files = await FileSystem.readDirectoryAsync(cacheDir);
-      const ttsFiles = files.filter(f => f.startsWith('tts_output_') && f.endsWith(`.${ext}`));
-      for (const file of ttsFiles) {
-        if (file !== `tts_output_${timestamp}.${ext}`) {
-          const fileUri = `${cacheDir}${file}`;
-          await FileSystem.deleteAsync(fileUri);
-        }
-      }
+      await cleanupStaleTtsFiles(cacheDir, uri, ext);
     }
   } catch (error) {
     // Ignore cleanup errors
   }
-  
+
   return uri;
 }
