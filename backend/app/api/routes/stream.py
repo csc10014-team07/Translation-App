@@ -15,6 +15,7 @@ import collections
 import io
 import json
 import logging
+import threading
 import time
 from typing import Any
 
@@ -83,6 +84,7 @@ async def _utterance_worker(
     websocket: WebSocket,
     ws_lock: asyncio.Lock,
     config_ref: list[dict[str, Any]],
+    abort_event: threading.Event,
 ) -> None:
     """Drain the job queue and process utterances in order.
 
@@ -103,7 +105,9 @@ async def _utterance_worker(
             if kind == "utterance":
                 pcm_bytes: bytes = payload
                 try:
-                    await _process_utterance(websocket, ws_lock, pcm_bytes, config)
+                    await _process_utterance(
+                        websocket, ws_lock, pcm_bytes, config, abort_event
+                    )
                 except Exception as exc:
                     logger.exception("Worker: utterance processing failed")
                     await _send_error(websocket, ws_lock, exc)
@@ -118,7 +122,9 @@ async def _utterance_worker(
                             "text": text,
                             "elapsed_ms": 0.0,
                         })
-                    await _stream_translation_and_tts(websocket, ws_lock, text, config)
+                    await _stream_translation_and_tts(
+                        websocket, ws_lock, text, config, abort_event
+                    )
                 except Exception as exc:
                     logger.exception("Worker: text job failed")
                     await _send_error(websocket, ws_lock, exc)
@@ -136,9 +142,10 @@ async def _process_utterance(
     ws_lock: asyncio.Lock,
     pcm_bytes: bytes,
     config: dict[str, Any],
+    abort_event: threading.Event,
 ) -> None:
     """Run ASR → Streaming Translation → TTS for one completed utterance."""
-    if len(pcm_bytes) < VADSettings.min_speech_bytes:
+    if len(pcm_bytes) < VADSettings.min_speech_bytes or abort_event.is_set():
         return
 
     manager = get_model_manager()
@@ -174,11 +181,13 @@ async def _process_utterance(
             "elapsed_ms": round(asr_ms, 2),
         })
 
-    if not transcript:
+    if not transcript or abort_event.is_set():
         return
 
     # ── Steps 2 & 3: Translation & Speech Synthesis ────────────────────────
-    await _stream_translation_and_tts(websocket, ws_lock, transcript, config)
+    await _stream_translation_and_tts(
+        websocket, ws_lock, transcript, config, abort_event
+    )
 
 
 async def _stream_translation_and_tts(
@@ -186,8 +195,12 @@ async def _stream_translation_and_tts(
     ws_lock: asyncio.Lock,
     text: str,
     config: dict[str, Any],
+    abort_event: threading.Event,
 ) -> None:
     """Stream translation tokens progressively and synthesize translated speech audio."""
+    if abort_event.is_set():
+        return
+
     manager = get_model_manager()
     loop = asyncio.get_event_loop()
     target_lang = config.get("target_lang", "en")
@@ -198,39 +211,65 @@ async def _stream_translation_and_tts(
     t1 = time.monotonic()
     translation_adapter = await manager.get_translation()
 
-    async with ws_lock:
-        await websocket.send_json({"type": "trans_start", "event": "trans_start"})
+    try:
+        async with ws_lock:
+            await websocket.send_json({"type": "trans_start", "event": "trans_start"})
+    except Exception:
+        abort_event.set()
+        raise
+
     full_tokens: list[str] = []
     token_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     def _producer() -> None:
+        generator = translation_adapter.translate_stream(
+            text=text,
+            target_language=target_lang,
+            source_language=source_lang,
+            context=context,
+        )
         try:
-            for tok in translation_adapter.translate_stream(
-                text=text,
-                target_language=target_lang,
-                source_language=source_lang,
-                context=context,
-            ):
+            for tok in generator:
+                if abort_event.is_set():
+                    break
                 loop.call_soon_threadsafe(token_queue.put_nowait, tok)
         except Exception as err:
             logger.warning("Error in translation generator: %s", err)
         finally:
+            # Closing the generator runs its ``finally`` block, releasing the
+            # LLM lock promptly instead of generating all remaining tokens.
+            close = getattr(generator, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:  # noqa: BLE001
+                    logger.debug("Error closing translation generator", exc_info=True)
             loop.call_soon_threadsafe(token_queue.put_nowait, None)
 
     producer_future = loop.run_in_executor(None, _producer)
 
-    while True:
-        tok = await token_queue.get()
-        if tok is None:
-            break
-        full_tokens.append(tok)
-        async with ws_lock:
-            await websocket.send_json({
-                "type": "trans_delta",
-                "event": "trans_delta",
-                "delta": tok,
-                "token": tok,
-            })
+    try:
+        while not abort_event.is_set():
+            tok = await token_queue.get()
+            if tok is None:
+                break
+            full_tokens.append(tok)
+            async with ws_lock:
+                await websocket.send_json({
+                    "type": "trans_delta",
+                    "event": "trans_delta",
+                    "delta": tok,
+                    "token": tok,
+                })
+    except asyncio.CancelledError:
+        abort_event.set()
+        raise
+    except Exception:
+        abort_event.set()
+        raise
+
+    if abort_event.is_set():
+        return
 
     await producer_future
 
@@ -246,7 +285,7 @@ async def _stream_translation_and_tts(
             "elapsed_ms": round(trans_ms, 2),
         })
 
-    if not translated_text:
+    if not translated_text or abort_event.is_set():
         return
 
     # ── Step 2: Speech Synthesis ───────────────────────────────────────────
@@ -256,6 +295,9 @@ async def _stream_translation_and_tts(
     audio_np, sample_rate = tts_result[0], tts_result[1]
     tts_ms = (time.monotonic() - t2) * 1000
     vram_tracker.record_warm_inference("tts", tts_ms)
+
+    if abort_event.is_set():
+        return
 
     audio_b64 = _encode_audio_b64(audio_np, sample_rate)
     async with ws_lock:
@@ -318,9 +360,10 @@ async def websocket_stream_endpoint(websocket: WebSocket) -> None:
     # Job queue and worker task
     job_queue: asyncio.Queue[Any] = asyncio.Queue()
     ws_lock = asyncio.Lock()
+    abort_event = threading.Event()
 
     worker_task = asyncio.ensure_future(
-        _utterance_worker(job_queue, websocket, ws_lock, config_ref)
+        _utterance_worker(job_queue, websocket, ws_lock, config_ref, abort_event)
     )
 
     try:
@@ -530,6 +573,9 @@ async def websocket_stream_endpoint(websocket: WebSocket) -> None:
         logger.exception("Error in /ws/stream")
     finally:
         # Signal the worker and wait for it to exit cleanly.
+        # Abort first so any in-flight translation generator releases the LLM
+        # lock instead of generating all remaining tokens after disconnect.
+        abort_event.set()
         job_queue.put_nowait(_STOP)
         try:
             await asyncio.wait_for(job_queue.join(), timeout=0.5)

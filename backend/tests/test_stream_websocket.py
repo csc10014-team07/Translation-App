@@ -446,3 +446,49 @@ def test_translate_text_non_string_does_not_disconnect():
             msg = ws.receive_json()
             if msg.get("type") == "stopped":
                 break
+
+
+# ---------------------------------------------------------------------------
+# (g) Disconnect/abort must close the translation generator (release lock).
+# ---------------------------------------------------------------------------
+
+
+def test_abort_closes_translation_generator():
+    """When the client disappears mid-stream, the producer must stop early."""
+    import asyncio
+    import time as _time
+
+    started = threading.Event()
+    closed = threading.Event()
+
+    def slow_stream(**kwargs: Any) -> Generator[str, None, None]:
+        started.set()
+        try:
+            for i in range(10000):
+                _time.sleep(0.01)
+                yield f"token_{i}"
+        finally:
+            closed.set()
+
+    manager, *_ = _make_fake_manager(trans_fn=slow_stream)
+    stream_mod.get_model_manager = lambda: manager  # type: ignore[assignment]
+
+    class DisconnectingWebSocket:
+        async def send_json(self, payload: dict) -> None:
+            if payload.get("type") == "trans_delta":
+                raise RuntimeError("client disconnected")
+
+    async def run() -> None:
+        await stream_mod._stream_translation_and_tts(
+            DisconnectingWebSocket(),  # type: ignore[arg-type]
+            asyncio.Lock(),
+            "hello",
+            {"target_lang": "en", "source_lang": "vi", "context": ""},
+            threading.Event(),
+        )
+
+    with pytest.raises(RuntimeError, match="client disconnected"):
+        asyncio.run(run())
+
+    assert started.wait(timeout=2), "Translation generator never started"
+    assert closed.wait(timeout=2), "Translation generator was not closed after abort"
