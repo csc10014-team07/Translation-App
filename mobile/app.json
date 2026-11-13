@@ -24,8 +24,20 @@
       }
     },
     "plugins": [
-      ["expo-av", { "microphonePermission": "Allow translation app to access microphone." }],
-      ["expo-image-picker", { "photosPermission": "Allow access to photos for OCR.", "cameraPermission": "Allow access to camera for OCR." }]
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow translation app to access microphone."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to photos for OCR.",
+          "cameraPermission": "Allow access to camera for OCR."
+        }
+      ],
+      "expo-font"
     ]
   }
 }
