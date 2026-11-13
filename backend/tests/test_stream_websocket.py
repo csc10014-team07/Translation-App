@@ -46,9 +46,15 @@ def _make_fake_manager(
     # ASR adapter
     asr_adapter = MagicMock()
     if asr_fn is not None:
-        asr_adapter.transcribe = asr_fn
+        asr_adapter.transcribe_array = asr_fn
     else:
-        asr_adapter.transcribe = lambda path: {"text": "transcribed", "language": "vi", "duration": 1.0}
+        asr_adapter.transcribe_array = (
+            lambda data, duration=None: {
+                "text": "transcribed",
+                "language": "vi",
+                "duration": 1.0,
+            }
+        )
 
     # Translation adapter
     trans_adapter = MagicMock()
@@ -175,10 +181,10 @@ def test_silence_does_not_grow_buffer_or_trigger_asr():
     """10 seconds of silence must not trigger asr_final and must keep buffer tiny."""
 
     asr_called = threading.Event()
-    original_transcribe = lambda path: (asr_called.set(), {"text": "oops", "language": "vi", "duration": 1.0})[1]  # noqa: E731
+    original_transcribe = lambda data, duration=None: (asr_called.set(), {"text": "oops", "language": "vi", "duration": 1.0})[1]  # noqa: E731
 
     manager, asr_adapter, *_ = _make_fake_manager(asr_fn=original_transcribe)
-    asr_adapter.transcribe = original_transcribe
+    asr_adapter.transcribe_array = original_transcribe
     app_ = _make_test_app(manager)
 
     from starlette.testclient import TestClient
@@ -217,7 +223,7 @@ def test_two_utterances_processed_in_order():
     call_order: list[str] = []
     counter = [0]
 
-    def ordered_transcribe(path: str) -> dict:
+    def ordered_transcribe(data, duration=None) -> dict:
         counter[0] += 1
         label = f"utterance_{counter[0]}"
         call_order.append(label)
@@ -283,7 +289,7 @@ def test_slow_utterance_does_not_block_receive_loop():
 
     call_index = [0]
 
-    def slow_transcribe(path: str) -> dict:
+    def slow_transcribe(data, duration=None) -> dict:
         import time as _time
         call_times.append(_time.monotonic())
         idx = call_index[0]
@@ -350,7 +356,7 @@ def test_stop_mid_speech_processes_buffered_audio():
 
     transcribed: list[str] = []
 
-    def recording_transcribe(path: str) -> dict:
+    def recording_transcribe(data, duration=None) -> dict:
         transcribed.append("called")
         return {"text": "mid_speech", "language": "vi", "duration": 0.5}
 

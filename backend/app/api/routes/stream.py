@@ -15,9 +15,7 @@ import collections
 import io
 import json
 import logging
-import tempfile
 import time
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -146,47 +144,41 @@ async def _process_utterance(
     manager = get_model_manager()
     loop = asyncio.get_event_loop()
 
-    # Convert raw int16 PCM to float32 WAV temp file
+    # Raw int16 PCM → mono float32 in memory (no disk round-trip).
     pcm_int16 = np.frombuffer(pcm_bytes, dtype=np.int16)
     pcm_float32 = pcm_int16.astype(np.float32) / 32768.0
+    duration = len(pcm_float32) / _SAMPLE_RATE
 
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        tmp_path = tmp.name
-
+    # ── Step 1: ASR ────────────────────────────────────────────────────────
+    t0 = time.monotonic()
+    asr = await manager.get_asr()
     try:
-        sf.write(tmp_path, pcm_float32, 16000, subtype="PCM_16")
+        asr_res = await loop.run_in_executor(
+            None, asr.transcribe_array, pcm_float32, duration
+        )
+    except ValueError as exc:
+        # Enforce audio-quality guard from the ASR adapter.
+        logger.warning("ASR rejected utterance: %s", exc)
+        await _send_error(websocket, ws_lock, exc)
+        return
 
-        # ── Step 1: ASR ────────────────────────────────────────────────────
-        t0 = time.monotonic()
-        asr = await manager.get_asr()
-        try:
-            asr_res = await loop.run_in_executor(None, asr.transcribe, tmp_path)
-        except ValueError as exc:
-            # Enforce audio-quality / duration guard from the ASR adapter.
-            logger.warning("ASR rejected utterance: %s", exc)
-            await _send_error(websocket, ws_lock, exc)
-            return
+    asr_ms = (time.monotonic() - t0) * 1000
+    vram_tracker.record_warm_inference("phoasr", asr_ms)
 
-        asr_ms = (time.monotonic() - t0) * 1000
-        vram_tracker.record_warm_inference("phoasr", asr_ms)
+    transcript = asr_res.get("text", "").strip()
+    async with ws_lock:
+        await websocket.send_json({
+            "type": "asr_final",
+            "event": "asr_final",
+            "text": transcript,
+            "elapsed_ms": round(asr_ms, 2),
+        })
 
-        transcript = asr_res.get("text", "").strip()
-        async with ws_lock:
-            await websocket.send_json({
-                "type": "asr_final",
-                "event": "asr_final",
-                "text": transcript,
-                "elapsed_ms": round(asr_ms, 2),
-            })
+    if not transcript:
+        return
 
-        if not transcript:
-            return
-
-        # ── Steps 2 & 3: Translation & Speech Synthesis ────────────────────
-        await _stream_translation_and_tts(websocket, ws_lock, transcript, config)
-
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
+    # ── Steps 2 & 3: Translation & Speech Synthesis ────────────────────────
+    await _stream_translation_and_tts(websocket, ws_lock, transcript, config)
 
 
 async def _stream_translation_and_tts(
