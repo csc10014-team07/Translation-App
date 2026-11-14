@@ -32,19 +32,6 @@ POCKET_TTS_SUPPORTED_LANGUAGES = [
 ]
 
 
-def download_phoasr(target_dir: Path) -> None:
-    """Download PhoASR-whisper-small model files."""
-    model_id = "Qualcomm-AI-Research/PhoASR-whisper-small"
-    print(f"\n[1/3] Downloading PhoASR ({model_id}) to {target_dir}...")
-    target_dir.mkdir(parents=True, exist_ok=True)
-    snapshot_download(
-        repo_id=model_id,
-        local_dir=str(target_dir),
-        local_dir_use_symlinks=False,
-        resume_download=True,
-    )
-    print(f"PhoASR download complete: {target_dir}")
-
 
 def download_gemma_gguf(target_file: Path) -> None:
     """Download TranslateGemma 4B GGUF (Q5_K_M quantization)."""
@@ -53,7 +40,7 @@ def download_gemma_gguf(target_file: Path) -> None:
     target_dir = target_file.parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n[2/3] Downloading TranslateGemma 4B GGUF ({filename}) from {repo_id}...")
+    print(f"\n[1/2] Downloading TranslateGemma 4B GGUF ({filename}) from {repo_id}...")
     if target_file.exists() and target_file.stat().st_size > 1024 * 1024 * 100:
         print(f"File already exists: {target_file} ({target_file.stat().st_size / (1024*1024):.1f} MB)")
         return
@@ -146,11 +133,7 @@ def main() -> None:
     base_dir.mkdir(parents=True, exist_ok=True)
     print(f"Models storage directory: {base_dir}")
 
-    phoasr_dir = base_dir / "phoasr"
     gemma_file = base_dir / "gemma" / "translategemma-4b-it.Q5_K_M.gguf"
-
-    if not args.skip_phoasr:
-        download_phoasr(phoasr_dir)
 
     if not args.skip_gemma:
         download_gemma_gguf(gemma_file)

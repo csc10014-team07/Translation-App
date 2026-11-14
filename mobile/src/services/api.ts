@@ -109,6 +109,33 @@ function appendFileToForm(
   } as unknown as Blob);
 }
 
+function getAudioFileInfo(
+  uri: string,
+  fallbackName: string,
+): { fileName: string; mimeType: string } {
+  const rawName = uri.split('/').pop()?.split('?')[0] ?? fallbackName;
+  const dotIndex = rawName.lastIndexOf('.');
+  const ext = dotIndex !== -1 ? rawName.slice(dotIndex + 1).toLowerCase() : 'm4a';
+  const fileName = dotIndex !== -1 ? rawName : `${rawName}.${ext}`;
+
+  let mimeType = 'application/octet-stream';
+  if (ext === 'm4a' || ext === 'mp4') {
+    mimeType = 'audio/mp4';
+  } else if (ext === 'wav') {
+    mimeType = 'audio/wav';
+  } else if (ext === 'mp3') {
+    mimeType = 'audio/mpeg';
+  } else if (ext === 'flac') {
+    mimeType = 'audio/flac';
+  } else if (ext === 'ogg') {
+    mimeType = 'audio/ogg';
+  } else if (ext === 'webm') {
+    mimeType = 'audio/webm';
+  }
+
+  return { fileName, mimeType };
+}
+
 // ──────────────────────────────────────────────
 // API functions
 // ──────────────────────────────────────────────
@@ -226,8 +253,11 @@ export async function checkHealth(): Promise<HealthResponse> {
   return response.data;
 }
 
+let lastTtsAudioUri: string | null = null;
+
 /**
  * Decode a base64 audio string returned by TTS and save it to a temp file.
+ * Cleans up the previously generated audio file to avoid leaking disk space.
  * Returns the local URI of the saved file.
  */
 const TTS_CACHE_PREFIX = 'tts_output_';
@@ -266,7 +296,20 @@ async function cleanupStaleTtsFiles(
 export async function saveBase64Audio(
   base64: string,
   format: string,
+  previousUri?: string | null,
 ): Promise<string> {
+  const fileToDelete = previousUri || lastTtsAudioUri;
+  if (fileToDelete) {
+    try {
+      const info = await FileSystem.getInfoAsync(fileToDelete);
+      if (info.exists) {
+        await FileSystem.deleteAsync(fileToDelete, { idempotent: true });
+      }
+    } catch {
+      // Ignore cache cleanup failure
+    }
+  }
+
   const ext = format ?? 'wav';
   const timestamp = Date.now();
   const unique = Math.random().toString(36).slice(2, 8);
