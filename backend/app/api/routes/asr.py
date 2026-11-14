@@ -11,7 +11,6 @@ import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from app.api.deps import dep_model_manager
-from app.core.config import settings
 from app.core.vram_monitor import vram_tracker
 from app.models.manager import ModelManager
 from app.schemas.asr import ASRResponse
@@ -53,14 +52,19 @@ async def transcribe_audio(
     chunks: list[bytes] = []
     total = 0
     while chunk := await audio.read(65_536):
-        total += len(chunk)
-        if total > _MAX_AUDIO_SIZE_BYTES:
+        if total + len(chunk) > _MAX_AUDIO_SIZE_BYTES:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail="Audio file exceeds 100 MB limit.",
             )
+        total += len(chunk)
         chunks.append(chunk)
     raw_bytes = b"".join(chunks)
+    if len(raw_bytes) < 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Audio file is empty or too short to be processed.",
+        )
 
     # ── Save to a temp file ────────────────────────────────────────────────
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -70,14 +74,32 @@ async def transcribe_audio(
         async with aiofiles.open(tmp_path, "wb") as f:
             await f.write(raw_bytes)
 
+        # ── Check duration before transcribing ────────────────────────────────
+        from app.core.config import settings
+        from app.models.asr_adapter import load_audio_file
+
+        # Load audio to get duration (avoids wasted transcription if too long)
+        try:
+            audio_data, duration = await asyncio.get_event_loop().run_in_executor(
+                None, load_audio_file, tmp_path, 16000
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+
+        if duration > settings.MAX_AUDIO_DURATION_S:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Audio exceeds maximum duration of {settings.MAX_AUDIO_DURATION_S} seconds.",
+            )
+
         # ── Run ASR ────────────────────────────────────────────────────────
         asr = await manager.get_asr()
         t0 = time.monotonic()
         result: dict = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: asr.transcribe(
-                tmp_path, max_duration_s=settings.MAX_AUDIO_DURATION_S
-            ),
+            None, asr.transcribe_array, audio_data, duration
         )
         elapsed_ms = (time.monotonic() - t0) * 1000
         vram_tracker.record_warm_inference("phoasr", elapsed_ms)
@@ -85,16 +107,45 @@ async def transcribe_audio(
         return ASRResponse(
             text=result["text"],
             language_detected=result.get("language", "vi"),
+            duration=result.get("duration"),
+            elapsed_ms=round(elapsed_ms, 2),
             word_timestamps=result.get("word_timestamps") or None,
         )
 
+    except HTTPException:
+        raise
     except FileNotFoundError as exc:
         logger.error("Temp audio file not found: %s", exc)
         raise HTTPException(status_code=500, detail="Internal server error during ASR.") from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        logger.warning("ASR service unavailable: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ASR service unavailable.",
+        ) from exc
     except Exception as exc:
-        logger.exception("Unexpected error during ASR: %s", exc)
+        err_msg = str(exc)
+        exc_type = type(exc).__name__
+        if (
+            "Format not recognised" in err_msg
+            or "LibsndfileError" in exc_type
+            or "SoundFileError" in exc_type
+            or "AVError" in exc_type
+            or "InvalidDataError" in exc_type
+            or "corrupted" in err_msg.lower()
+            or "Error opening" in err_msg
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unreadable audio content: {err_msg}",
+            ) from exc
+        logger.exception("Unexpected error during ASR")
         raise HTTPException(status_code=500, detail="ASR failed. See server logs.") from exc
     finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        try:
+            Path(tmp_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+

@@ -14,17 +14,17 @@ Shutdown sequence
 from __future__ import annotations
 
 import logging
-import shutil
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import asr, metrics, ocr, translate, tts
+from app.api.routes import asr, metrics, ocr, stream, translate, tts
 from app.core.config import settings
 from app.core.vram_monitor import get_vram_info
 from app.models.manager import get_model_manager
+from app.schemas.health import HealthResponse
 
 # ── Logging ────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -42,10 +42,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle startup and shutdown events."""
     manager = get_model_manager()
     logger.info("=== Translation App starting up ===")
-    if not shutil.which("ffmpeg"):
+    try:
+        import av  # noqa: F401
+    except ImportError:
         logger.warning(
-            "ffmpeg was not found on PATH. Decoding non-WAV audio (e.g. .m4a recordings from mobile) "
-            "requires ffmpeg. Please install ffmpeg on the host system."
+            "PyAV (av) is not installed. Decoding .m4a and other mobile audio formats requires PyAV."
         )
     logger.info("Device: %s", settings.effective_device())
     logger.info("VRAM at boot: %s", get_vram_info())
@@ -68,7 +69,8 @@ def create_app() -> FastAPI:
         title="Translation App API",
         description=(
             "Vietnamese Translation App backend — ASR (PhoASR), "
-            "Translation & OCR (TranslateGemma 4B), TTS (Pocket TTS)."
+            "Context-Aware Translation (TranslateGemma-4B), OCR (RapidOCR), "
+            "and Hybrid TTS (Pocket TTS voice cloning / Edge-TTS)."
         ),
         version="1.0.0",
         lifespan=lifespan,
@@ -85,6 +87,17 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # ── API Key Middleware (enforced only when API_KEY is set) ──────────────
+    @application.middleware("http")
+    async def api_key_middleware(request, call_next):
+        if settings.API_KEY:
+            if request.url.path not in ("/health", "/docs", "/redoc", "/openapi.json"):
+                api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+                if api_key != settings.API_KEY:
+                    from starlette.responses import JSONResponse
+                    return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+        return await call_next(request)
+
     # ── Routers ────────────────────────────────────────────────────────────
     prefix = settings.API_PREFIX
     application.include_router(asr.router, prefix=prefix)
@@ -92,12 +105,26 @@ def create_app() -> FastAPI:
     application.include_router(translate.router, prefix=prefix)
     application.include_router(tts.router, prefix=prefix)
     application.include_router(metrics.router, prefix=prefix)
+    application.include_router(stream.router)  # /ws/stream root path
+
 
     # ── Health check ───────────────────────────────────────────────────────
-    @application.get("/health", tags=["Health"])
-    async def health() -> dict:
-        """Quick liveness probe — returns 200 when the app is running."""
-        return {"status": "ok", "vram": get_vram_info()}
+    @application.get("/health", response_model=HealthResponse, tags=["Health"])
+    async def health() -> HealthResponse:
+        """Quick liveness probe — returns 200 with status, device, VRAM, and model status."""
+        from app.models.manager import get_model_manager
+
+        vram_info = get_vram_info()
+        manager = get_model_manager()
+        model_status = manager.get_status() if manager._is_started else {}
+        return HealthResponse(
+            status="ok",
+            device=settings.effective_device(),
+            vram=vram_info,
+            vram_allocated_mb=vram_info.get("allocated_mb", 0.0),
+            vram_total_mb=vram_info.get("total_mb", 0.0),
+            models_loaded=model_status.get("models_loaded", {}),
+        )
 
     return application
 

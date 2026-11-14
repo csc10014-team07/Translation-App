@@ -1,203 +1,157 @@
-"""ASR adapter wrapping PhoASR-Whisper-small via HuggingFace Transformers."""
+"""ASR Adapter wrapping Qualcomm PhoASR-whisper-small."""
 from __future__ import annotations
 
 import logging
 import threading
-import time
 from pathlib import Path
+from typing import Any
 
-import librosa
 import numpy as np
 import soundfile as sf
 import torch
-from transformers import WhisperForConditionalGeneration, WhisperProcessor
+from transformers import pipeline
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_SAMPLE_RATE = 16_000  # Whisper expects 16 kHz input
+
+def load_audio_file(audio_path: str | Path, target_sr: int = 16000) -> tuple[np.ndarray, float]:
+    """
+    Ingest audio file in WAV, MP3, M4A, FLAC, OGG, or WebM format,
+    normalize to mono float32, and resample to target_sr (16 kHz).
+
+    Returns:
+        tuple of (audio_samples, duration_seconds)
+
+    Raises:
+        ValueError: If audio is corrupted, empty, or silent.
+    """
+    path_str = str(audio_path)
+    audio_data: np.ndarray | None = None
+
+    # First attempt decoding via PyAV (supports WAV, MP3, M4A/AAC, FLAC, OGG, WebM)
+    try:
+        import av
+
+        container = av.open(path_str)
+        try:
+            resampler = av.AudioResampler(format="fltp", layout="mono", rate=target_sr)
+            frames = []
+            for frame in container.decode(audio=0):
+                for rf in resampler.resample(frame):
+                    frames.append(rf.to_ndarray().flatten())
+            if frames:
+                audio_data = np.concatenate(frames).astype(np.float32)
+        finally:
+            container.close()
+    except Exception as av_err:
+        logger.debug("PyAV decode failed (%s), attempting soundfile fallback", av_err)
+        try:
+            data, sr = sf.read(path_str)
+            if data.ndim > 1:
+                data = data.mean(axis=1)
+            if sr != target_sr:
+                try:
+                    import soxr
+
+                    data = soxr.resample(data, sr, target_sr)
+                except ImportError:
+                    try:
+                        import librosa
+
+                        data = librosa.resample(data, orig_sr=sr, target_sr=target_sr)
+                    except ImportError:
+                        target_len = int(len(data) * target_sr / sr)
+                        data = np.interp(
+                            np.linspace(0, len(data), target_len, endpoint=False),
+                            np.arange(len(data)),
+                            data,
+                        ).astype(np.float32)
+            audio_data = data.astype(np.float32)
+        except Exception as sf_err:
+            raise ValueError(f"Unreadable audio content: {sf_err}") from sf_err
+
+    if audio_data is None or len(audio_data) == 0:
+        raise ValueError("Audio file is empty or contains no readable audio data.")
+
+    # Check for silent audio (all zeros or near-zero amplitude)
+    if float(np.abs(audio_data).max()) < 1e-4:
+        raise ValueError("Audio is silent or contains no detectable speech.")
+
+    duration = round(float(len(audio_data) / target_sr), 2)
+    return audio_data, duration
 
 
 class ASRAdapter:
-    """
-    Thin wrapper around ``WhisperProcessor`` + ``WhisperForConditionalGeneration``
-    for Vietnamese speech recognition using PhoASR-whisper-small.
+    """High-accuracy Vietnamese ASR adapter using PhoASR-whisper-small."""
 
-    Lifecycle
-    ---------
-    1. Call :meth:`load` once at startup (device = CUDA).
-    2. Use :meth:`transcribe` for inference — the model stays in VRAM permanently.
-    3. Inference calls are protected by a lock for thread-safety.
-    """
-
-    def __init__(self) -> None:
-        self._processor: WhisperProcessor | None = None
-        self._model: WhisperForConditionalGeneration | None = None
-        self._device: str = "cpu"
-        self._loaded: bool = False
+    def __init__(self, device: str | None = None) -> None:
+        self.device = device or settings.effective_device()
+        self.model_id = settings.PHOASR_MODEL_ID
+        self._pipe = None
         self._lock = threading.Lock()
 
-    # ── Public API ─────────────────────────────────────────────────────────
-
-    def load(
-        self,
-        model_id: str,
-        device: str,
-        cache_dir: str | Path | None = None,
-    ) -> None:
-        """
-        Load PhoASR Whisper model to *device* in FP16.
-
-        Args:
-            model_id:  HuggingFace model ID, e.g. ``"Qualcomm-AI-Research/PhoASR-whisper-small"``.
-            device:    ``"cuda"`` or ``"cpu"``.
-            cache_dir: Optional cache directory for model weights. If omitted,
-                       derived from ``settings.MODELS_DIR`` relative to ``backend/``.
-        """
-        backend_dir = Path(__file__).resolve().parent.parent.parent
-        if cache_dir is None:
-            models_path = Path(settings.MODELS_DIR)
-            resolved_cache_dir = (
-                models_path if models_path.is_absolute() else (backend_dir / models_path).resolve()
+    def load(self) -> None:
+        """Load PhoASR pipeline onto target device."""
+        if self._pipe is None:
+            logger.info("Loading PhoASR (%s) onto %s...", self.model_id, self.device)
+            # Parse device string to get GPU index (e.g., "cuda:1" -> 1, "cuda" -> 0, else -1 for CPU)
+            if self.device.startswith("cuda"):
+                parts = self.device.split(":")
+                device_arg = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+            else:
+                device_arg = -1
+            self._pipe = pipeline(
+                "automatic-speech-recognition",
+                model=self.model_id,
+                device=device_arg,
             )
-        else:
-            p = Path(cache_dir)
-            resolved_cache_dir = p if p.is_absolute() else (backend_dir / p).resolve()
+            logger.info("PhoASR ready.")
 
-        resolved_cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_dir_str = str(resolved_cache_dir)
-
-        logger.info(
-            "Loading ASR model '%s' to %s using cache directory: %s …",
-            model_id,
-            device,
-            cache_dir_str,
-        )
-        t0 = time.monotonic()
-
-        self._processor = WhisperProcessor.from_pretrained(
-            model_id,
-            cache_dir=cache_dir_str,
-        )
-        self._model = WhisperForConditionalGeneration.from_pretrained(
-            model_id,
-            cache_dir=cache_dir_str,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-        )
-        self._model.eval()
-        self._model.to(device)
-        self._device = device
-        self._loaded = True
-
-        elapsed_ms = (time.monotonic() - t0) * 1000
-        logger.info("ASR model loaded in %.0f ms", elapsed_ms)
-
-    def transcribe(
+    def transcribe_array(
         self,
-        audio_path: str,
-        max_duration_s: float | None = None,
-    ) -> dict:
+        audio_data: np.ndarray,
+        duration: float | None = None,
+    ) -> dict[str, Any]:
+        """Transcribe already-decoded mono float32 audio at 16 kHz.
+
+        Avoids re-reading/re-decoding the audio when the caller already holds
+        the samples in memory (e.g. raw PCM from the streaming endpoint).
         """
-        Transcribe a Vietnamese audio file.
+        self.load()
+        if duration is None:
+            duration = round(float(len(audio_data) / 16000), 2)
 
-        The audio is resampled to 16 kHz if necessary.  Language is forced
-        to Vietnamese (``vi``) so the model never auto-detects the wrong
-        language.
+        generate_kwargs = {
+            "task": "transcribe",
+            "language": "vi",
+        }
+        with self._lock:
+            res = self._pipe(audio_data, generate_kwargs=generate_kwargs)
+        text = res.get("text", "").strip()
 
-        Args:
-            audio_path:     Absolute or relative path to the audio file.
-            max_duration_s: Optional maximum audio duration in seconds.
+        return {
+            "text": text,
+            "language": "vi",
+            "duration": duration,
+            "word_timestamps": None,
+        }
+
+    def transcribe(self, audio_path: str | Path) -> dict[str, Any]:
+        """
+        Transcribe audio file into Vietnamese text.
 
         Returns:
-            A dict with keys:
-            - ``text``            – transcribed string
-            - ``language``        – always ``"vi"``
-            - ``word_timestamps`` – list of word-level timing dicts (may be empty)
-
-        Raises:
-            RuntimeError: If the model has not been loaded yet.
-            FileNotFoundError: If *audio_path* does not exist.
-            ValueError: If audio cannot be loaded or exceeds *max_duration_s*.
+            dict with 'text', 'language', and 'duration'.
         """
-        if not self._loaded or self._model is None or self._processor is None:
-            raise RuntimeError("ASRAdapter.load() must be called before transcribe().")
-
-        audio_path_obj = Path(audio_path)
-        if not audio_path_obj.exists():
-            raise FileNotFoundError(f"Audio file not found: {audio_path}")
-
-        logger.debug("Transcribing '%s' …", audio_path)
-
-        with self._lock:
-            t0 = time.monotonic()
-
-            # ── Load and resample ──────────────────────────────────────────────
-            try:
-                audio, orig_sr = librosa.load(str(audio_path_obj), sr=None, mono=True)
-            except Exception as exc:
-                raise ValueError(f"Failed to load audio '{audio_path}': {exc}") from exc
-
-            duration_s = float(len(audio)) / float(orig_sr)
-            if max_duration_s is not None and duration_s > max_duration_s:
-                raise ValueError(
-                    f"Audio duration ({duration_s:.1f} s) exceeds maximum allowed duration ({max_duration_s:.1f} s)."
-                )
-
-            if orig_sr != _SAMPLE_RATE:
-                audio = librosa.resample(audio, orig_sr=orig_sr, target_sr=_SAMPLE_RATE)
-
-            # ── Feature extraction ─────────────────────────────────────────────
-            inputs = self._processor(
-                audio,
-                sampling_rate=_SAMPLE_RATE,
-                return_tensors="pt",
-            )
-            input_features = inputs.input_features.to(
-                self._device,
-                dtype=torch.float16 if self._device == "cuda" else torch.float32,
-            )
-
-            # ── Forced Vietnamese decoding ─────────────────────────────────────
-            forced_decoder_ids = self._processor.get_decoder_prompt_ids(
-                language="vi", task="transcribe"
-            )
-
-            with torch.no_grad():
-                predicted_ids = self._model.generate(
-                    input_features,
-                    forced_decoder_ids=forced_decoder_ids,
-                )
-
-            text: str = self._processor.batch_decode(
-                predicted_ids, skip_special_tokens=True
-            )[0].strip()
-
-            elapsed_ms = (time.monotonic() - t0) * 1000
-            logger.info("Transcription completed in %.0f ms, text length=%d", elapsed_ms, len(text))
-
-            return {
-                "text": text,
-                "language": "vi",
-                "word_timestamps": [],  # full timestamp support requires return_timestamps=True
-            }
-
-    # ── VRAM lifecycle ─────────────────────────────────────────────────────
+        data, duration = load_audio_file(audio_path, target_sr=16000)
+        return self.transcribe_array(data, duration)
 
     def unload(self) -> None:
-        """Free the model and clear CUDA cache."""
-        logger.info("Unloading ASR model...")
-        if self._model is not None:
-            del self._model
-            self._model = None
-        if self._processor is not None:
-            del self._processor
-            self._processor = None
-        self._loaded = False
-        torch.cuda.empty_cache()
-        logger.info("ASR model unloaded.")
+        """Free pipeline memory."""
+        self._pipe = None
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        logger.info("PhoASR unloaded.")
 
-    @property
-    def is_loaded(self) -> bool:
-        """True if the model weights have been loaded (regardless of device)."""
-        return self._loaded

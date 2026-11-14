@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -10,11 +11,10 @@ import {
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import VoiceRecorder from './VoiceRecorder';
-import { isTtsSupported } from '../constants/languages';
 
 interface Props {
   translatedText: string;
-  translatedLanguage: string;
+  targetLanguage: string;
   isSynthesizing: boolean;
   synthesizedAudioUri: string | null;
   onRecordReference: (uri: string) => void;
@@ -26,7 +26,7 @@ const MIN_DURATION_MS = 3000;
 
 export default function VoiceCloningPanel({
   translatedText,
-  translatedLanguage,
+  targetLanguage,
   isSynthesizing,
   synthesizedAudioUri,
   onRecordReference,
@@ -34,7 +34,7 @@ export default function VoiceCloningPanel({
 }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
-  const isTtsUnavailable = !isTtsSupported(translatedLanguage);
+  const isTtsUnavailable = targetLanguage === 'vi';
 
   const [referenceRecorded, setReferenceRecorded] = useState(false);
   const [isPlayingOutput, setIsPlayingOutput] = useState(false);
@@ -106,14 +106,14 @@ export default function VoiceCloningPanel({
         <View style={styles.unavailableBox}>
           <Ionicons name="information-circle" size={18} color="#F59E0B" />
           <Text style={styles.unavailableText}>
-            Voice output is unavailable for this language.
+            TTS is not available when the target language is Vietnamese.
           </Text>
         </View>
       ) : (
         <>
-          {/* Voice Recorder */}
+          {/* Reference Voice Recorder */}
           <Text style={[styles.sectionLabel, isDark && styles.textDark]}>
-            Record reference voice{' '}
+            1. Record reference voice{' '}
             <Text style={styles.hint}>(≥ 3 seconds)</Text>
           </Text>
           <VoiceRecorder

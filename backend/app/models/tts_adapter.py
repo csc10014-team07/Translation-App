@@ -1,185 +1,304 @@
-"""TTS adapter wrapping Pocket TTS."""
+"""TTS Adapter providing Hybrid Voice-Cloning and Natural Neural Speech."""
 from __future__ import annotations
 
 import logging
+import tempfile
 import threading
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import Any
 
 import numpy as np
-import torch
+import soundfile as sf
 
-if TYPE_CHECKING:
-    pass
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_VIETNAMESE_LANG_CODES = {"vi", "vietnamese", "vie", "tiếng việt"}
+# Pocket TTS supported languages mapping (short code -> canonical model name)
+POCKET_TTS_LANG_MAP: dict[str, str] = {
+    "en": "english", "english": "english",
+    "fr": "french", "french": "french",
+    "de": "german", "german": "german",
+    "es": "spanish", "spanish": "spanish",
+    "pt": "portuguese", "portuguese": "portuguese",
+    "it": "italian", "italian": "italian",
+    "nl": "dutch", "dutch": "dutch",
+}
+POCKET_TTS_LANGUAGES = set(POCKET_TTS_LANG_MAP.keys())
 
-# Map language names/codes to Pocket TTS language identifiers
-_POCKET_TTS_LANGUAGE_MAP = {
-    "en": "english",
-    "english": "english",
-    "eng": "english",
-    "fr": "french",
-    "french": "french",
-    "fra": "french",
-    "de": "german",
-    "german": "german",
-    "deu": "german",
-    "pt": "portuguese",
-    "portuguese": "portuguese",
-    "por": "portuguese",
-    "it": "italian",
-    "italian": "italian",
-    "ita": "italian",
-    "es": "spanish",
-    "spanish": "spanish",
-    "spa": "spanish",
+# Edge TTS language to voice mapping
+EDGE_VOICES_FEMALE = {
+    "vi": "vi-VN-HoaiMyNeural", "vietnamese": "vi-VN-HoaiMyNeural", "vie": "vi-VN-HoaiMyNeural",
+    "en": "en-US-JennyNeural", "english": "en-US-JennyNeural",
+    "ja": "ja-JP-NanamiNeural", "japanese": "ja-JP-NanamiNeural",
+    "zh": "zh-CN-XiaoxiaoNeural", "chinese": "zh-CN-XiaoxiaoNeural",
+    "ko": "ko-KR-SunHiNeural", "korean": "ko-KR-SunHiNeural",
+    "fr": "fr-FR-DeniseNeural", "french": "fr-FR-DeniseNeural",
+    "de": "de-DE-KatjaNeural", "german": "de-DE-KatjaNeural",
+    "es": "es-ES-ElviraNeural", "spanish": "es-ES-ElviraNeural",
+    "pt": "pt-BR-FranciscaNeural", "portuguese": "pt-BR-FranciscaNeural",
+    "it": "it-IT-ElsaNeural", "italian": "it-IT-ElsaNeural",
+    "ru": "ru-RU-SvetlanaNeural", "russian": "ru-RU-SvetlanaNeural",
 }
 
-_SUPPORTED_POCKET_TTS_LANGUAGES = {"english", "french", "german", "portuguese", "italian", "spanish"}
+EDGE_VOICES_MALE = {
+    "vi": "vi-VN-NamMinhNeural", "vietnamese": "vi-VN-NamMinhNeural", "vie": "vi-VN-NamMinhNeural",
+    "en": "en-US-GuyNeural", "english": "en-US-GuyNeural",
+    "ja": "ja-JP-KeitaNeural", "japanese": "ja-JP-KeitaNeural",
+    "zh": "zh-CN-YunxiNeural", "chinese": "zh-CN-YunxiNeural",
+    "ko": "ko-KR-InJoonNeural", "korean": "ko-KR-InJoonNeural",
+    "fr": "fr-FR-HenriNeural", "french": "fr-FR-HenriNeural",
+    "de": "de-DE-KillianNeural", "german": "de-DE-KillianNeural",
+    "es": "es-ES-AlvaroNeural", "spanish": "es-ES-AlvaroNeural",
+    "pt": "pt-BR-AntonioNeural", "portuguese": "pt-BR-AntonioNeural",
+    "it": "it-IT-DiegoNeural", "italian": "it-IT-DiegoNeural",
+    "ru": "ru-RU-DmitryNeural", "russian": "ru-RU-DmitryNeural",
+}
 
+EDGE_VOICES = EDGE_VOICES_FEMALE
 
-def _is_vietnamese(language: str) -> bool:
-    """Return True if *language* refers to Vietnamese."""
-    return language.strip().lower() in _VIETNAMESE_LANG_CODES
+class TTSResult(tuple):
+    """Tuple of (audio_array: np.ndarray, sample_rate: int) with metadata attributes."""
+    audio: np.ndarray
+    sample_rate: int
+    engine: str
+    voice_note: str
 
-
-def _map_language_to_pocket_tts(language: str) -> str:
-    """Map a language identifier to Pocket TTS language code."""
-    lang = language.strip().lower()
-    return _POCKET_TTS_LANGUAGE_MAP.get(lang, lang)
+    def __new__(cls, audio: np.ndarray, sample_rate: int, engine: str = "edge_tts", voice_note: str = "") -> TTSResult:
+        obj = super().__new__(cls, (audio, sample_rate))
+        obj.audio = audio
+        obj.sample_rate = sample_rate
+        obj.engine = engine
+        obj.voice_note = voice_note
+        return obj
 
 
 class TTSAdapter:
-    """
-    Thin wrapper around Pocket TTS for voice synthesis.
-
-    Maintains one Pocket TTS model per language, loaded lazily on CPU.
-    Voice states for default voices are cached per language.
-    Uses per-language locks for thread-safe loading and synthesis.
-    """
+    """Hybrid TTS adapter: Pocket TTS (CPU Voice Cloning) + Edge-TTS (Native Vietnamese & Neutral)."""
 
     def __init__(self) -> None:
-        self._models: dict[str, torch.nn.Module] = {}
-        self._voice_states: dict[str, torch.Tensor] = {}
-        # Create locks for each supported language upfront
-        self._load_locks: dict[str, threading.Lock] = {
-            lang: threading.Lock() for lang in _SUPPORTED_POCKET_TTS_LANGUAGES
-        }
-        self._synth_locks: dict[str, threading.Lock] = {
-            lang: threading.Lock() for lang in _SUPPORTED_POCKET_TTS_LANGUAGES
-        }
+        self._pocket_models: dict[str, Any] = {}
+        self._pocket_load_locks: dict[str, threading.Lock] = {}
+        self._pocket_inference_lock = threading.Lock()
+        # Pre-create locks for all Pocket TTS canonical languages
+        for lang in set(POCKET_TTS_LANG_MAP.values()):
+            self._pocket_load_locks[lang] = threading.Lock()
 
-    # ── Lifecycle ──────────────────────────────────────────────────────────
-
-    def _ensure_model_loaded(self, pocket_lang: str) -> torch.nn.Module:
-        """Load Pocket TTS model for *pocket_lang* if not already loaded."""
-        if pocket_lang not in self._models:
-            lock = self._load_locks[pocket_lang]
+    def _load_pocket_tts(self, language: str) -> Any:
+        """Load Pocket TTS model for a specific language."""
+        lang_key = language.strip().lower()
+        canonical_lang = POCKET_TTS_LANG_MAP.get(lang_key, lang_key)
+        if canonical_lang not in self._pocket_models:
+            lock = self._pocket_load_locks.get(canonical_lang)
+            if lock is None:
+                lock = threading.Lock()
+                self._pocket_load_locks[canonical_lang] = lock
             with lock:
-                if pocket_lang not in self._models:
-                    logger.info("Loading Pocket TTS model for language=%s on CPU...", pocket_lang)
-                    from pocket_tts import TTSModel
-                    self._models[pocket_lang] = TTSModel.load_model(language=pocket_lang)
-                    logger.info("Pocket TTS model loaded for language=%s.", pocket_lang)
-        return self._models[pocket_lang]
+                # Double-check after acquiring lock
+                if canonical_lang not in self._pocket_models:
+                    try:
+                        from pocket_tts import TTSModel
+                        logger.info("Loading Pocket TTS model for %s on CPU (0MB VRAM)...", canonical_lang)
+                        model = TTSModel.load_model(language=canonical_lang)
+                        self._pocket_models[canonical_lang] = model
+                        logger.info("Pocket TTS loaded successfully for %s on CPU.", canonical_lang)
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("Could not load Pocket TTS for %s: %s", canonical_lang, e)
+                        self._pocket_models[canonical_lang] = None
+        return self._pocket_models.get(canonical_lang)
 
-    def _get_voice_state(self, pocket_lang: str) -> torch.Tensor:
-        """Get or create cached voice state for the default voice of *pocket_lang*."""
-        if pocket_lang not in self._voice_states:
-            model = self._ensure_model_loaded(pocket_lang)
-            from pocket_tts.default_parameters import get_default_voice_for_language
-            voice_name = get_default_voice_for_language(pocket_lang)
-            self._voice_states[pocket_lang] = model.get_state_for_audio_prompt(voice_name)
-            logger.debug("Cached voice state for language=%s.", pocket_lang)
-        return self._voice_states[pocket_lang]
+    def _get_pocket_voice_state(self, model: Any, reference_audio_path: str | Path | None) -> tuple[dict[str, Any], str]:
+        """Get the voice state for Pocket TTS, either from reference audio or default."""
+        if reference_audio_path is not None:
+            ref_path = Path(reference_audio_path)
+            if ref_path.exists():
+                try:
+                    state = model.get_state_for_audio_prompt(str(reference_audio_path))
+                    logger.info("Pocket TTS voice cloning active from user reference audio.")
+                    return state, "voice cloned from reference audio"
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("Pocket TTS cloning failed (%s), using default voice.", e)
+                    # Fall back to default voice
+                    voice_name = "alba"
+                    return model.get_state_for_audio_prompt(voice_name), f"cloning failed ({e}), using default voice '{voice_name}'"
+        # No reference audio, use default voice
+        voice_name = "alba"
+        return model.get_state_for_audio_prompt(voice_name), f"using default voice '{voice_name}'"
 
-    def load(self, model_language: str | None = None, device: str = "cpu") -> None:
+    def _get_default_pocket_voice_for_language(self, language: str) -> str:
+        """Get the default voice name for a Pocket TTS language."""
+        try:
+            from pocket_tts import default_parameters
+            return default_parameters.get_default_voice_for_language(language)
+        except Exception:  # noqa: BLE001
+            return "alba"
+
+    def _resolve_edge_voice(self, language: str, voice_style: str | None = None) -> tuple[str, str]:
+        """Resolve the appropriate Edge-TTS voice based on language and voice_style.
+        
+        Returns:
+            tuple of (voice_name, voice_note)
         """
-        Pre-load a specific language model (optional).
-        Models are loaded lazily by default; device is ignored.
+        lang_key = language.strip().lower()
+        voice_note = ""
+        
+        if voice_style:
+            style_key = voice_style.strip().lower()
+            if "neural" in style_key:
+                return voice_style.strip(), f"explicit voice: {voice_style}"
+            if style_key in ("male", "nam", "boy", "man"):
+                voice = EDGE_VOICES_MALE.get(lang_key, "en-US-GuyNeural")
+                voice_note = f"male voice: {voice}"
+                return voice, voice_note
+            if style_key in ("female", "nu", "girl", "woman"):
+                voice = EDGE_VOICES_FEMALE.get(lang_key, "en-US-JennyNeural")
+                voice_note = f"female voice: {voice}"
+                return voice, voice_note
+        
+        voice = EDGE_VOICES_FEMALE.get(lang_key, "en-US-JennyNeural")
+        voice_note = f"default voice: {voice}"
+        return voice, voice_note
+
+    def _is_edge_language_supported(self, language: str) -> bool:
+        """Check if a language is supported by Edge-TTS."""
+        lang_key = language.strip().lower()
+        # All languages that have entries in EDGE_VOICES_FEMALE or EDGE_VOICES_MALE are supported
+        supported = set(EDGE_VOICES_FEMALE.keys()) | set(EDGE_VOICES_MALE.keys())
+        return lang_key in supported
+
+    async def _synthesize_edge_tts(
+        self, text: str, language: str, voice_style: str | None = None
+    ) -> TTSResult:
+        """Synthesize using Edge-TTS with async/await."""
+        if not settings.EDGE_TTS_ENABLED:
+            raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
+        
+        if not self._is_edge_language_supported(language):
+            lang_key = language.strip().lower()
+            raise ValueError(f"Unknown Edge-TTS language: {language} (lang_key: {lang_key})")
+        
+        import aiohttp
+        import edge_tts
+
+        voice, voice_note = self._resolve_edge_voice(language, voice_style)
+
+        connector = aiohttp.TCPConnector(limit=10, force_close=True, limit_per_host=5)
+        comm = edge_tts.Communicate(
+            text,
+            voice,
+            connector=connector,
+            connect_timeout=10,
+            receive_timeout=20,
+        )
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, mode='wb') as tmp:
+            tmp_path = tmp.name
+        try:
+            await comm.save(tmp_path)
+            data, sr = sf.read(tmp_path)
+            if data.ndim > 1:
+                data = data.mean(axis=1)
+            audio_arr = data.astype(np.float32)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+        return TTSResult(audio_arr, sr, engine="edge_tts", voice_note=voice_note)
+
+    async def synthesize(
+        self,
+        text: str,
+        language: str = "English",
+        reference_audio_path: str | Path | None = None,
+        voice_style: str | None = None,
+        preferred_engine: str | None = None,
+    ) -> TTSResult:
         """
-        if model_language:
-            pocket_lang = _map_language_to_pocket_tts(model_language)
-            if pocket_lang in _SUPPORTED_POCKET_TTS_LANGUAGES:
-                self._ensure_model_loaded(pocket_lang)
+        Synthesize speech from text.
 
-    def unload(self) -> None:
-        """Free all models from memory."""
-        logger.info("Unloading all Pocket TTS models...")
-        self._models.clear()
-        self._voice_states.clear()
-        logger.info("All Pocket TTS models unloaded.")
+        For Pocket TTS supported languages (en/fr/de/es/pt/it), use Pocket TTS on CPU
+        with voice cloning when reference audio is provided.
+        For other languages, use Edge-TTS for native neural speech.
 
-    # ── Inference ──────────────────────────────────────────────────────────
+        Returns:
+            TTSResult: Tuple of (audio_array: np.ndarray, sample_rate: int) with .engine and .voice_note attributes
+        Raises:
+            ValueError: If the requested engine is not available or language is unsupported
+            RuntimeError: If Edge-TTS is disabled but required, or synthesis fails
+        """
+        lang_lower = language.strip().lower()
+        is_vietnamese = lang_lower in ("vi", "vietnamese", "vie")
+        
+        # Check if explicit engine requested
+        if preferred_engine:
+            preferred_lower = preferred_engine.lower()
+            if preferred_lower == "pocket_tts":
+                canonical_lang = POCKET_TTS_LANG_MAP.get(lang_lower)
+                if not canonical_lang:
+                    raise ValueError(f"Pocket TTS does not support language: {language}")
+                return self._synthesize_pocket_tts(text, canonical_lang, reference_audio_path, voice_style)
+            elif preferred_lower == "edge_tts":
+                if not settings.EDGE_TTS_ENABLED:
+                    raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
+                if not self._is_edge_language_supported(language):
+                    raise ValueError(f"Unknown Edge-TTS language: {language}")
+                return await self._synthesize_edge_tts(text, language, voice_style)
+        
+        # Vietnamese always uses Edge-TTS
+        if is_vietnamese:
+            if not settings.EDGE_TTS_ENABLED:
+                raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
+            if not self._is_edge_language_supported(language):
+                raise ValueError(f"Unknown Edge-TTS language: {language}")
+            return await self._synthesize_edge_tts(text, language, voice_style)
+        
+        # Pocket TTS languages: use Pocket TTS if reference audio is provided
+        canonical_lang = POCKET_TTS_LANG_MAP.get(lang_lower)
+        if canonical_lang:
+            if reference_audio_path is not None:
+                ref_path = Path(reference_audio_path) if reference_audio_path else None
+                if ref_path is not None and ref_path.exists():
+                    return self._synthesize_pocket_tts(text, canonical_lang, reference_audio_path, voice_style)
+        
+        # Default: use Edge-TTS for all other cases
+        if not settings.EDGE_TTS_ENABLED:
+            raise RuntimeError("Edge-TTS is disabled (EDGE_TTS_ENABLED=false)")
+        if not self._is_edge_language_supported(language):
+            raise ValueError(f"Unknown Edge-TTS language: {language}")
+        return await self._synthesize_edge_tts(text, language, voice_style)
 
-    def synthesize(
+    def _synthesize_pocket_tts(
         self,
         text: str,
         language: str,
-        reference_audio_path: str | None = None,
-    ) -> tuple[np.ndarray, int]:
-        """
-        Synthesize speech for *text*.
-
-        Args:
-            text:                   Text to synthesize.
-            language:               Target spoken language.
-            reference_audio_path:   Path to a reference WAV for voice cloning (optional).
-
-        Returns:
-            A tuple ``(audio_array, sample_rate)`` where *audio_array* is a
-            1-D float32 NumPy array and *sample_rate* is typically 24 000.
-
-        Raises:
-            ValueError: If *language* is Vietnamese or not supported by Pocket TTS,
-                       or if reference audio cannot be used.
-            RuntimeError: If model loading fails.
-        """
-        if _is_vietnamese(language):
-            raise ValueError(
-                "TTS is not supported for Vietnamese target language. "
-                "Vietnamese output is text-only."
-            )
-
-        pocket_lang = _map_language_to_pocket_tts(language)
+        reference_audio_path: str | Path | None,
+        voice_style: str | None,
+    ) -> TTSResult:
+        """Synthesize using Pocket TTS with per-language model loading."""
+        # Load Pocket TTS for this language
+        model = self._load_pocket_tts(language)
+        if model is None:
+            raise RuntimeError(f"Pocket TTS model failed to load for {language}")
         
-        if pocket_lang not in _SUPPORTED_POCKET_TTS_LANGUAGES:
-            raise ValueError(
-                f"TTS is not supported for language '{language}'. "
-                f"Supported languages: {sorted(_SUPPORTED_POCKET_TTS_LANGUAGES)}"
-            )
-
-        model = self._ensure_model_loaded(pocket_lang)
-        synth_lock = self._synth_locks[pocket_lang]
-
-        logger.debug("Synthesizing %d chars in language '%s'...", len(text), language)
-
-        with synth_lock:
-            # Use reference audio for voice cloning if provided
-            if reference_audio_path:
-                try:
-                    voice_state = model.get_state_for_audio_prompt(reference_audio_path)
-                except Exception as exc:
-                    raise ValueError(f"Could not use reference audio: {exc}") from exc
-            else:
-                voice_state = self._get_voice_state(pocket_lang)
-
-            audio_tensor = model.generate_audio(voice_state, text)
-
-            if isinstance(audio_tensor, torch.Tensor):
-                audio_array = audio_tensor.detach().cpu().numpy()
-            else:
-                audio_array = np.array(audio_tensor, dtype=np.float32)
-
-            audio_array = audio_array.astype(np.float32)
-            sample_rate = model.sample_rate
-
-            logger.info("TTS synthesis completed, sr=%d", sample_rate)
-            return audio_array, sample_rate
-
-    @property
-    def is_loaded(self) -> bool:
-        """True if at least one model has been loaded."""
-        return len(self._models) > 0
+        voice_note = ""
+        try:
+            with self._pocket_inference_lock:
+                # Get voice state
+                state, state_note = self._get_pocket_voice_state(model, reference_audio_path)
+                voice_note = state_note
+                
+                # Handle voice_style override
+                if voice_style and voice_style.lower() != "pocket_tts":
+                    # Try to use the specified voice as audio conditioning
+                    try:
+                        state = model.get_state_for_audio_prompt(voice_style)
+                        voice_note = f"voice style: {voice_style}"
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning("Voice style '%s' not recognized, using default: %s", voice_style, e)
+                        voice_note = f"voice style '{voice_style}' not recognized, using default"
+                
+                # Generate audio with the voice state
+                audio_tensor = model.generate_audio(state, text, max_tokens=250)
+                audio_np = audio_tensor.squeeze().cpu().numpy().astype(np.float32)
+                
+                return TTSResult(audio_np, model.sample_rate, engine="pocket_tts", voice_note=voice_note)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Pocket TTS synthesis failed for %s: %s", language, e)
+            raise RuntimeError(f"Pocket TTS synthesis failed: {e}") from e
