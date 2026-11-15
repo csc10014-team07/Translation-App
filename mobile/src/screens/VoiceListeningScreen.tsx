@@ -26,6 +26,7 @@ import {
 } from '../services/liveAudio';
 import { transcribeAudio as apiTranscribeAudio } from '../services/api';
 import { useTranslationStore } from '../store/translationStore';
+import { getSourceLabel, DEFAULT_TARGET_CODE } from '../constants/languages';
 import { useVoiceRecording } from '../hooks/useVoiceRecording';
 
 type Phase = 'listening' | 'recognizing';
@@ -39,6 +40,8 @@ export default function VoiceListeningScreen({
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const requestAutoTranslate = useTranslationStore((st) => st.requestAutoTranslate);
+  // Ngôn ngữ NGUỒN hiện tại — gửi lên ASR/stream và dùng cho dòng gợi ý.
+  const inputLanguage = useTranslationStore((st) => st.inputLanguage);
 
   // Nghe trực tiếp cần native module (development build); Expo Go → ghi rồi nhận dạng.
   const liveSupported = isLiveAudioSupported();
@@ -105,8 +108,9 @@ export default function VoiceListeningScreen({
     sessionIdRef.current = sessionId;
 
     const client = new StreamClient({
-      sourceLang: 'vi',
-      targetLang: useTranslationStore.getState().targetLanguage || 'en',
+      sourceLang: inputLanguage,
+      targetLang:
+        useTranslationStore.getState().targetLanguage || DEFAULT_TARGET_CODE,
       onAsrInterim: (text) => {
         if (sessionId !== sessionIdRef.current) return;
         interimRef.current = text;
@@ -153,7 +157,7 @@ export default function VoiceListeningScreen({
       setErrorMessage(strings.error.generic);
       setIsListening(false);
     }
-  }, []);
+  }, [inputLanguage]);
 
   // ── Phiên ghi âm file (Expo Go) ──
   const startRecordingSession = useCallback(async () => {
@@ -196,23 +200,33 @@ export default function VoiceListeningScreen({
     return () => sub.remove();
   }, [stopEverything]);
 
-  // ── Nghe lại sau khi không nhận được chữ ──
+  // ── Nghe lại (đổi nguồn / không nhận được chữ) → xoá phiên cũ, bắt đầu lại ──
   const restartListening = useCallback(async () => {
+    stopEverything(); // tăng sessionId → mọi kết quả phiên cũ bị bỏ
     stoppedRef.current = false;
+    confirmedRef.current = '';
     interimRef.current = '';
+    setConfirmedText('');
     setInterimText('');
     setPhase('listening');
     setIsListening(true);
     if (liveSupported) {
-      if (streamClientRef.current) {
-        streamClientRef.current.disconnect();
-        streamClientRef.current = null;
-      }
       await startLiveSession();
     } else {
       await startRecordingSession();
     }
-  }, [liveSupported, startLiveSession, startRecordingSession]);
+  }, [liveSupported, startLiveSession, startRecordingSession, stopEverything]);
+
+  // ── Nguồn đổi giữa phiên → bỏ kết quả cũ, bắt đầu phiên theo ngôn ngữ mới ──
+  const sessionLanguageRef = useRef(inputLanguage);
+  useEffect(() => {
+    if (sessionLanguageRef.current === inputLanguage) return;
+    sessionLanguageRef.current = inputLanguage;
+    if (!stoppedRef.current) {
+      setErrorMessage(null);
+      void restartListening();
+    }
+  }, [inputLanguage, restartListening]);
 
   // ── Nút DỪNG: chốt chữ rồi yêu cầu dịch ──
   const handleStop = useCallback(async () => {
@@ -249,7 +263,9 @@ export default function VoiceListeningScreen({
       const uri = await stopRecording();
       if (uri) {
         try {
-          const result = await apiTranscribeAudio(uri);
+          const result = await apiTranscribeAudio(uri, inputLanguage);
+          // Vô hiệu nếu nguồn đổi giữa chừng → bỏ kết quả của nguồn cũ.
+          if (sessionIdRef.current !== mySession) return;
           const text = result.text?.trim() ?? '';
           if (text) {
             const merged = confirmedRef.current
@@ -284,6 +300,7 @@ export default function VoiceListeningScreen({
     restartListening,
     requestAutoTranslate,
     navigation,
+    inputLanguage,
   ]);
 
   // ── Nút ×: huỷ toàn bộ, KHÔNG đổi vietnameseText ──
@@ -315,7 +332,9 @@ export default function VoiceListeningScreen({
         <ThemedText
           style={[styles.hint, { color: colors.textSecondary, marginTop: vs(14) }]}
         >
-          {liveSupported ? strings.voice.hint : strings.voice.hintNoLive}
+          {liveSupported
+            ? strings.voice.hint(getSourceLabel(inputLanguage))
+            : strings.voice.hintNoLive(getSourceLabel(inputLanguage))}
         </ThemedText>
 
         {/* ── CARD CHỨA CHỮ NHẬN DẠNG ── */}

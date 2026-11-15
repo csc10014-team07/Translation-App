@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type RootStackParamList = {
   Home: undefined;
   TargetLanguage: undefined;
-  DefaultLanguage: undefined;
+  SourceLanguage: undefined;
   VoiceListening: { liveSupported?: boolean } | undefined;
   Camera: undefined;
 };
@@ -14,9 +14,9 @@ export type TargetLanguageScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'TargetLanguage'
 >;
-export type DefaultLanguageScreenProps = NativeStackScreenProps<
+export type SourceLanguageScreenProps = NativeStackScreenProps<
   RootStackParamList,
-  'DefaultLanguage'
+  'SourceLanguage'
 >;
 export type VoiceListeningScreenProps = NativeStackScreenProps<
   RootStackParamList,

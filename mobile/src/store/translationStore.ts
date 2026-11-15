@@ -11,7 +11,14 @@ import {
   startLiveAudioCapture,
   stopLiveAudioCapture,
 } from '../services/liveAudio';
-import { supportsSpeechToText } from '../constants/languages';
+import {
+  DEFAULT_SOURCE_CODE,
+  DEFAULT_TARGET_CODE,
+  getLanguage,
+  LanguageCode,
+  TARGET_LANGUAGES,
+  supportsSpeechToText,
+} from '../constants/languages';
 import { strings } from '../constants/strings';
 import { buildContext } from '../utils/buildContext';
 import { useSettingsStore } from './settingsStore';
@@ -83,6 +90,7 @@ export interface TranslationState {
   setContextNote: (note: string) => void;
   toggleContext: () => void;
   setContextOpen: (open: boolean) => void;
+  setSourceLang: (code: string) => void;
   setTargetLang: (code: string) => void;
   requestAutoTranslate: (text: string) => void;
   consumeAutoTranslate: () => boolean;
@@ -97,10 +105,10 @@ let streamSessionId = 0;
 
 const initialState = {
   inputMode: 'text' as InputMode,
-  inputLanguage: 'vi',
+  inputLanguage: DEFAULT_SOURCE_CODE,
   vietnameseText: '',
   context: '',
-  targetLanguage: 'en',
+  targetLanguage: DEFAULT_TARGET_CODE,
   translatedText: '',
   sourceLanguage: '',
   referenceAudioUri: null as string | null,
@@ -177,7 +185,9 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       set((state) => ({
         vietnameseText: result.vietnamese_text,
         translatedText: result.translated_text || state.translatedText,
-        inputLanguage: result.detected_language || state.inputLanguage,
+        // KHÔNG đổi ngôn ngữ nguồn theo `detected_language` (backend dễ nhầm,
+        // và người dùng đã chọn nguồn). Giữ nguyên `inputLanguage`.
+        inputLanguage: state.inputLanguage,
       }));
     } catch (e: unknown) {
       set({ error: extractErrorMessage(e, 'Failed to process image.') });
@@ -194,7 +204,8 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
   },
 
   translate: async () => {
-    const { vietnameseText, targetLanguage, tones, contextNote } = get();
+    const { vietnameseText, inputLanguage, targetLanguage, tones, contextNote } =
+      get();
     if (!vietnameseText.trim()) {
       set({ phase: 'error', translateError: strings.error.generic });
       return;
@@ -212,7 +223,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       const result = await apiTranslateText(
         vietnameseText,
         targetLanguage,
-        'vi',
+        inputLanguage,
         context || undefined,
         contextPreset,
       );
@@ -279,7 +290,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
 
     const client = new StreamClient({
       sourceLang: inputLanguage,
-      targetLang: targetLanguage || 'en',
+      targetLang: targetLanguage || DEFAULT_TARGET_CODE,
       customContext: context || '',
       cloneVoice: !!referenceAudioUri,
       onAsrInterim: (text) => {
@@ -429,12 +440,47 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
 
   setContextOpen: (open) => set({ contextOpen: open }),
 
-  setTargetLang: (code) => {
-    const { phase } = get();
+  setSourceLang: (code) => {
+    // Bỏ qua mã không có trong catalog.
+    if (!getLanguage(code)) return;
+    const { inputLanguage, targetLanguage, phase } = get();
+    // Nguồn luôn khác đích: nếu trùng thì hoán đổi (đích ← nguồn cũ).
+    const nextTarget: string =
+      code === targetLanguage ? inputLanguage : targetLanguage;
+
     if (phase === 'result' || phase === 'error') {
-      set({ targetLanguage: code, phase: 'idle', translatedText: '', translateError: null });
+      set({
+        inputLanguage: code,
+        targetLanguage: nextTarget,
+        phase: 'idle',
+        translatedText: '',
+        translateError: null,
+      });
     } else {
-      set({ targetLanguage: code });
+      set({ inputLanguage: code, targetLanguage: nextTarget });
+    }
+
+    // Lưu bền thành nguồn mặc định cho lần mở app sau.
+    useSettingsStore.getState().setDefaultSourceLang(code as LanguageCode);
+  },
+
+  setTargetLang: (code) => {
+    // Bỏ qua mã không có trong catalog.
+    if (!getLanguage(code)) return;
+    const { inputLanguage, targetLanguage, phase } = get();
+    // Nguồn luôn khác đích: nếu trùng thì hoán đổi (nguồn ← đích cũ).
+    const nextSource: string =
+      code === inputLanguage ? targetLanguage : inputLanguage;
+    if (phase === 'result' || phase === 'error') {
+      set({
+        targetLanguage: code,
+        inputLanguage: nextSource,
+        phase: 'idle',
+        translatedText: '',
+        translateError: null,
+      });
+    } else {
+      set({ targetLanguage: code, inputLanguage: nextSource });
     }
   },
 
@@ -499,10 +545,32 @@ function classifyTranslateError(e: unknown): string {
 /**
  * Đọc cài đặt mặc định từ settingsStore (sau khi hydrate) và áp vào
  * translationStore. Gọi 1 lần khi app khởi động.
+ *
+ * - NGUỒN = `defaultSourceLang` đã lưu.
+ * - ĐÍCH = `DEFAULT_TARGET_CODE` ('en'), nhưng nếu nguồn là 'en' thì đổi sang
+ *   'vi' (hoặc ngôn ngữ ĐÍCH đầu tiên khác nguồn) để nguồn luôn khác đích.
  */
 export function applyDefaultsFromSettings(): void {
-  const { defaultTargetLang } = useSettingsStore.getState();
-  useTranslationStore.setState({ targetLanguage: defaultTargetLang });
+  const { defaultSourceLang } = useSettingsStore.getState();
+
+  const source =
+    (getLanguage(defaultSourceLang)?.canBeSource ?? false)
+      ? defaultSourceLang
+      : DEFAULT_SOURCE_CODE;
+
+  let target: LanguageCode = DEFAULT_TARGET_CODE;
+  if (target === source) {
+    // Nguồn là 'en' → đích 'vi' nếu dịch sang tiếng Việt được,
+    // ngược lại ngôn ngữ ĐÍCH đầu tiên khác nguồn.
+    const vi = TARGET_LANGUAGES.find((l) => l.code === 'vi');
+    const firstOther = TARGET_LANGUAGES.find((l) => l.code !== source);
+    target = (vi?.code ?? firstOther?.code ?? target) as LanguageCode;
+    if (target === source) {
+      target = (firstOther?.code ?? target) as LanguageCode;
+    }
+  }
+
+  useTranslationStore.setState({ inputLanguage: source, targetLanguage: target });
 }
 
 function extractErrorMessage(e: unknown, fallback: string): string {

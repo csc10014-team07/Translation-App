@@ -61,11 +61,16 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
 
   const runOcrOnly = useTranslationStore((st) => st.runOcrOnly);
   const requestAutoTranslate = useTranslationStore((st) => st.requestAutoTranslate);
+  // Ngôn ngữ NGUỒN hiện tại. OCR KHÔNG tự đổi nguồn theo kết quả nhận dạng
+  // (detect_language của backend dễ nhầm) — chỉ giữ nguyên lựa chọn của người dùng.
+  const inputLanguage = useTranslationStore((st) => st.inputLanguage);
 
   const cameraRef = useRef<CameraView | null>(null);
   const capturingRef = useRef(false);
   // Phiên OCR: tăng mỗi lần bắt đầu/chụp lại/huỷ để bỏ kết quả về muộn.
   const ocrSessionRef = useRef(0);
+  // Ngôn ngữ dùng cho phiên OCR hiện tại — để bỏ kết quả nếu nguồn đổi giữa chừng.
+  const ocrLanguageRef = useRef(inputLanguage);
   // Cờ mounted để không set state / điều hướng sau khi màn đã đóng.
   const mountedRef = useRef(true);
 
@@ -122,11 +127,25 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
     if (!isCameraState && torchOn) turnOffTorch();
   }, [isCameraState, torchOn, turnOffTorch]);
 
+  // ── Nguồn đổi trong lúc đang OCR → bỏ kết quả cũ (huỷ phiên hiện tại) ──
+  useEffect(() => {
+    if (ocrLanguageRef.current === inputLanguage) return;
+    ocrLanguageRef.current = inputLanguage;
+    if (camState === 'processing') {
+      ocrSessionRef.current += 1; // bỏ kết quả OCR đang chờ
+      setCapturedUri(null);
+      setErrorMessage(strings.camera.failHint);
+      setCamState('ready');
+    }
+  }, [inputLanguage, camState]);
+
   // ── Nhận ảnh (chụp/thư viện) → chạy OCR ──
   const handleImagePicked = useCallback(
     (uri: string) => {
       const session = ocrSessionRef.current + 1;
       ocrSessionRef.current = session;
+      // Ghi nhớ ngôn ngữ nguồn của phiên này để bỏ kết quả nếu người dùng đổi.
+      ocrLanguageRef.current = inputLanguage;
 
       setCapturedUri(uri);
       setErrorMessage(strings.camera.failHint);
@@ -154,7 +173,7 @@ export default function CameraScreen({ navigation }: CameraScreenProps) {
         }
       })();
     },
-    [runOcrOnly, requestAutoTranslate, navigation, turnOffTorch],
+    [runOcrOnly, requestAutoTranslate, navigation, turnOffTorch, inputLanguage],
   );
 
   // ── Nút "Chụp lại": quay lại xem trước ──

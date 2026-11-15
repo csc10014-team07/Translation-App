@@ -3,6 +3,10 @@
  * Connects to /ws/stream over local LAN or Cloudflare Tunnel.
  */
 import { getStreamWebSocketUrl } from './api';
+import {
+  DEFAULT_SOURCE_CODE,
+  DEFAULT_TARGET_CODE,
+} from '../constants/languages';
 
 const STOP_DRAIN_TIMEOUT_MS = 5000;
 
@@ -57,8 +61,8 @@ export class StreamClient {
           // Handshake payload as per spec.md contract
           const handshake = {
             action: 'start',
-            source_lang: this.options.sourceLang || 'vi',
-            target_lang: this.options.targetLang || 'en',
+            source_lang: this.options.sourceLang || DEFAULT_SOURCE_CODE,
+            target_lang: this.options.targetLang || DEFAULT_TARGET_CODE,
             context_preset: this.options.contextPreset || 'General',
             custom_context: this.options.customContext || '',
             clone_voice: this.options.cloneVoice ?? false,

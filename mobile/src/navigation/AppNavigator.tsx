@@ -4,7 +4,7 @@ import type { RootStackParamList } from './types';
 import { useTheme } from '../theme/ThemeProvider';
 import HomeScreen from '../screens/HomeScreen';
 import TargetLanguageScreen from '../screens/TargetLanguageScreen';
-import DefaultLanguageScreen from '../screens/DefaultLanguageScreen';
+import SourceLanguageScreen from '../screens/SourceLanguageScreen';
 import VoiceListeningScreen from '../screens/VoiceListeningScreen';
 import CameraScreen from '../screens/CameraScreen';
 
@@ -24,7 +24,11 @@ export default function AppNavigator() {
       <Stack.Screen name="Home" component={HomeScreen} />
 
       <Stack.Screen name="TargetLanguage" component={TargetLanguageScreen} />
-      <Stack.Screen name="DefaultLanguage" component={DefaultLanguageScreen} />
+      <Stack.Screen
+        name="SourceLanguage"
+        component={SourceLanguageScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
 
       <Stack.Screen
         name="VoiceListening"

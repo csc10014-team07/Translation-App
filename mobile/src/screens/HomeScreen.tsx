@@ -20,11 +20,19 @@ import type { HomeScreenProps } from '../navigation/types';
 import { useTheme } from '../theme/ThemeProvider';
 import ThemedText from '../theme/ThemedText';
 import IconCircleButton from '../components/IconCircleButton';
+import LanguageTile from '../components/LanguageTile';
 import ToneChip from '../components/ToneChip';
 import PrimaryButton from '../components/PrimaryButton';
 import ErrorCard from '../components/ErrorCard';
 import { strings } from '../constants/strings';
-import { SOURCE_LANGUAGE, getTargetLabel } from '../constants/languages';
+import {
+  getSourceFullLabel,
+  getSourceLabel,
+  getTargetLabel,
+  supportsOcr,
+  supportsTts,
+  supportsVoiceInput,
+} from '../constants/languages';
 import {
   useTranslationStore,
   applyDefaultsFromSettings,
@@ -48,11 +56,15 @@ const TONES: { id: ToneId; label: string }[] = [
   { id: 'business', label: strings.tones.business },
 ];
 
+/** Thời gian tự ẩn dòng thông báo nhỏ dưới ô nhập (ms). */
+const INPUT_HINT_HIDE_MS = 3000;
+
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { colors, mode, toggleMode } = useTheme();
   const insets = useSafeAreaInsets();
 
   // ── Store ──
+  const inputLanguage = useTranslationStore((st) => st.inputLanguage);
   const targetLanguage = useTranslationStore((st) => st.targetLanguage);
   const vietnameseText = useTranslationStore((st) => st.vietnameseText);
   const phase = useTranslationStore((st) => st.phase);
@@ -70,11 +82,27 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Dọn timeout copy khi unmount
+  // ── Dòng thông báo nhỏ dưới ô nhập (ví dụ: nguồn không hỗ trợ mic/quét chữ) ──
+  const [inputHint, setInputHint] = useState<string | null>(null);
+  const inputHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Dọn timeout copy + thông báo khi unmount
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (inputHintTimeoutRef.current) clearTimeout(inputHintTimeoutRef.current);
     };
+  }, []);
+
+  /** Hiện dòng thông báo nhỏ dưới ô nhập, tự ẩn sau 3 giây, đọc cho screen reader. */
+  const showInputHint = useCallback((message: string) => {
+    setInputHint(message);
+    AccessibilityInfo.announceForAccessibility(message);
+    if (inputHintTimeoutRef.current) clearTimeout(inputHintTimeoutRef.current);
+    inputHintTimeoutRef.current = setTimeout(
+      () => setInputHint(null),
+      INPUT_HINT_HIDE_MS,
+    );
   }, []);
 
   // ── Áp ngôn ngữ đích mặc định 1 lần, sau khi settingsStore hydrate xong ──
@@ -128,6 +156,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   // Nút Dịch chỉ hiện ở phase idle / translating
   const showTranslateBar = phase === 'idle' || phase === 'translating';
 
+  // Ngôn ngữ đích có giọng đọc (TTS) hay không — quyết định hiện nút "Đọc to".
+  const ttsSupported = supportsTts(targetLanguage);
+
   // ── Mở / đóng thẻ ngữ cảnh với animation ──
   const handleToggleContext = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -166,6 +197,24 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     clearText();
     inputRef.current?.focus();
   }, [clearText]);
+
+  // ── Mic: chỉ mở màn Giọng nói khi nguồn hỗ trợ ASR ──
+  const handleMic = useCallback(() => {
+    if (!supportsVoiceInput(inputLanguage)) {
+      showInputHint(strings.voice.unsupported(getSourceLabel(inputLanguage)));
+      return;
+    }
+    navigation.navigate('VoiceListening');
+  }, [inputLanguage, showInputHint, navigation]);
+
+  // ── Camera: chỉ mở màn quét chữ khi nguồn hỗ trợ OCR ──
+  const handleCamera = useCallback(() => {
+    if (!supportsOcr(inputLanguage)) {
+      showInputHint(strings.camera.ocrUnsupported(getSourceLabel(inputLanguage)));
+      return;
+    }
+    navigation.navigate('Camera');
+  }, [inputLanguage, showInputHint, navigation]);
 
   const handleTranslate = useCallback(() => {
     Keyboard.dismiss();
@@ -209,22 +258,15 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
             {/* HÀNG NGÔN NGỮ */}
             <View style={[styles.languageRow, { marginTop: vs(14) }]}>
-              {/* Thẻ "Dịch từ" — cố định */}
-              <View
-                style={[
-                  styles.langCard,
-                  styles.langCardLeft,
-                  { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-                ]}
-                accessibilityLabel={`${strings.home.from}: ${SOURCE_LANGUAGE.label}`}
-              >
-                <ThemedText variant="label" style={{ color: colors.textSecondary }}>
-                  {strings.home.from}
-                </ThemedText>
-                <ThemedText variant="value" style={{ color: colors.textPrimary }}>
-                  {SOURCE_LANGUAGE.label}
-                </ThemedText>
-              </View>
+              {/* Thẻ "Dịch từ" — bấm để chọn ngôn ngữ nguồn */}
+              <LanguageTile
+                label={strings.home.from}
+                value={getSourceLabel(inputLanguage)}
+                onPress={() => navigation.navigate('SourceLanguage')}
+                accessibilityLabel={`${strings.home.from} ${getSourceFullLabel(
+                  inputLanguage,
+                )}, ${strings.accessibility.changeTarget}`}
+              />
 
               {/* Mũi tên giữa */}
               <View style={styles.arrowWrap}>
@@ -232,34 +274,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               </View>
 
               {/* Thẻ "Dịch sang" */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${strings.home.to} ${getTargetLabel(targetLanguage)}, ${strings.accessibility.changeTarget}`}
+              <LanguageTile
+                label={strings.home.to}
+                value={getTargetLabel(targetLanguage)}
                 onPress={() => navigation.navigate('TargetLanguage')}
-                style={({ pressed }) => [
-                  styles.langCard,
-                  styles.langCardRight,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                    opacity: pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                <View style={styles.langCardTextCol}>
-                  <ThemedText variant="label" style={{ color: colors.textSecondary }}>
-                    {strings.home.to}
-                  </ThemedText>
-                  <ThemedText
-                    variant="value"
-                    style={{ color: colors.textPrimary }}
-                    numberOfLines={1}
-                  >
-                    {getTargetLabel(targetLanguage)}
-                  </ThemedText>
-                </View>
-                <Ionicons name="chevron-down" size={ms(20)} color={colors.textSecondary} />
-              </Pressable>
+                accessibilityLabel={`${strings.home.to} ${getTargetLabel(
+                  targetLanguage,
+                )}, ${strings.accessibility.changeTarget}`}
+              />
             </View>
           </View>
         </View>
@@ -331,7 +353,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                   size="medium"
                   variant="soft"
                   accessibilityLabel={strings.accessibility.mic}
-                  onPress={() => navigation.navigate('VoiceListening')}
+                  onPress={handleMic}
                 />
                 <View style={{ width: s(11) }} />
                 <IconCircleButton
@@ -339,13 +361,26 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                   size="medium"
                   variant="soft"
                   accessibilityLabel={strings.accessibility.camera}
-                  onPress={() => navigation.navigate('Camera')}
+                  onPress={handleCamera}
                 />
               </View>
 
               {/* Spacer đẩy nội dung tránh đè lên 2 nút tròn */}
               <View style={{ height: vs(76) }} />
             </View>
+
+            {/* DÒNG THÔNG BÁO NHỎ NGAY DƯỚI Ô NHẬP — tự ẩn sau 3 giây */}
+            {inputHint !== null && (
+              <ThemedText
+                accessibilityLiveRegion="polite"
+                style={[
+                  styles.inputHint,
+                  { color: colors.textSecondary, marginTop: vs(10) },
+                ]}
+              >
+                {inputHint}
+              </ThemedText>
+            )}
 
             {/* THẺ KẾT QUẢ — chỉ hiện khi phase === 'result' */}
             {phase === 'result' && (
@@ -376,22 +411,28 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                   {translatedText}
                 </ThemedText>
 
-                {/* Hàng nút: Đọc to + Sao chép */}
+                {/* Hàng nút: Đọc to (chỉ khi ngôn ngữ đích có giọng) + Sao chép */}
                 <View style={[styles.resultActions, { marginTop: vs(16) }]}>
-                  <PrimaryButton
-                    variant="pill"
-                    label={
-                      speechStatus === 'playing'
-                        ? strings.home.stopReading
-                        : strings.home.readAloud
-                    }
-                    iconLeft={
-                      speechStatus === 'playing' ? 'stop' : 'volume-medium-outline'
-                    }
-                    loading={speechStatus === 'loading'}
-                    onPress={playSpeech}
-                  />
-                  <View style={{ width: s(12) }} />
+                  {ttsSupported && (
+                    <>
+                      <PrimaryButton
+                        variant="pill"
+                        label={
+                          speechStatus === 'playing'
+                            ? strings.home.stopReading
+                            : strings.home.readAloud
+                        }
+                        iconLeft={
+                          speechStatus === 'playing'
+                            ? 'stop'
+                            : 'volume-medium-outline'
+                        }
+                        loading={speechStatus === 'loading'}
+                        onPress={playSpeech}
+                      />
+                      <View style={{ width: s(12) }} />
+                    </>
+                  )}
                   <IconCircleButton
                     icon={copied ? 'checkmark' : 'copy-outline'}
                     size="medium"
@@ -399,6 +440,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     accessibilityLabel={strings.accessibility.copy}
                     onPress={handleCopy}
                   />
+                  {/* Ngôn ngữ đích không có giọng đọc → chú thích nhỏ, không có nút Đọc to */}
+                  {!ttsSupported && (
+                    <ThemedText
+                      style={[
+                        styles.ttsNote,
+                        { color: colors.textSecondary, marginLeft: s(12) },
+                      ]}
+                    >
+                      {strings.home.ttsUnsupported}
+                    </ThemedText>
+                  )}
                 </View>
 
                 {/* Lỗi TTS */}
@@ -606,21 +658,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: vs(59),
   },
-  langCard: {
-    flex: 1,
-    borderRadius: s(22),
-    borderWidth: 1,
-    paddingHorizontal: s(16),
-    justifyContent: 'center',
-    gap: vs(2),
-  },
-  langCardLeft: { minHeight: vs(59) },
-  langCardRight: {
-    minHeight: vs(59),
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  langCardTextCol: { flex: 1, gap: vs(2) },
   arrowWrap: {
     width: s(38),
     alignItems: 'center',
@@ -660,6 +697,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'center',
+  },
+
+  // ── Dòng thông báo nhỏ dưới ô nhập ──
+  inputHint: {
+    fontSize: ms(14),
+    lineHeight: ms(20),
+    fontWeight: '400',
+    paddingHorizontal: s(4),
   },
 
   // ── Link ngữ cảnh ──
@@ -741,6 +786,11 @@ const styles = StyleSheet.create({
   ttsError: {
     fontSize: ms(14),
     fontWeight: '400',
+  },
+  ttsNote: {
+    fontSize: ms(13),
+    fontWeight: '400',
+    flexShrink: 1,
   },
 
   // ── Thanh nút Dịch cố định ──

@@ -14,6 +14,8 @@ import {
   synthesizeSpeech,
   saveBase64Audio,
 } from '../services/api';
+import { supportsTts } from '../constants/languages';
+import { strings } from '../constants/strings';
 
 export type SpeechStatus = 'idle' | 'loading' | 'playing' | 'error';
 
@@ -106,6 +108,13 @@ export function useSpeech(
   // ── play (toggle: nếu đang phát thì dừng, ngược lại phát) ──
   const play = useCallback(async () => {
     if (!enabled) return;
+
+    // Ngôn ngữ đích không có giọng đọc → không gọi API, báo lỗi ngay.
+    if (!supportsTts(language)) {
+      setStatus('error');
+      setTtsError(strings.home.ttsUnsupported);
+      return;
+    }
 
     // Đang phát → dừng
     if (status === 'playing') {

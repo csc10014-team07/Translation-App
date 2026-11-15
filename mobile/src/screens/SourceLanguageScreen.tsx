@@ -6,33 +6,32 @@ import {
   ListRenderItemInfo,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { DefaultLanguageScreenProps } from '../navigation/types';
+import type { SourceLanguageScreenProps } from '../navigation/types';
 import { useTheme } from '../theme/ThemeProvider';
 import ThemedText from '../theme/ThemedText';
 import ScreenHeader from '../components/ScreenHeader';
 import LanguageRow from '../components/LanguageRow';
 import { strings } from '../constants/strings';
 import {
-  TARGET_LANGUAGES,
-  TargetLanguageCode,
+  SOURCE_LANGUAGES,
+  getSourceFullLabel,
+  Language,
 } from '../constants/languages';
-import {
-  useSettingsStore,
-} from '../store/settingsStore';
+import { useTranslationStore } from '../store/translationStore';
 import { s, vs, ms, MAX_CONTENT_WIDTH } from '../utils/scale';
 
-type LanguageItem = (typeof TARGET_LANGUAGES)[number];
+type LanguageItem = Language;
 
 /** Thời gian giữ màn để người dùng thấy dấu ✓ chuyển trước khi quay lại. */
 const GO_BACK_DELAY_MS = 250;
 
-export default function DefaultLanguageScreen({
+export default function SourceLanguageScreen({
   navigation,
-}: DefaultLanguageScreenProps) {
+}: SourceLanguageScreenProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const defaultTargetLang = useSettingsStore((st) => st.defaultTargetLang);
-  const setDefaultTargetLang = useSettingsStore((st) => st.setDefaultTargetLang);
+  const inputLanguage = useTranslationStore((st) => st.inputLanguage);
+  const setSourceLang = useTranslationStore((st) => st.setSourceLang);
 
   const goBackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,27 +43,27 @@ export default function DefaultLanguageScreen({
   }, []);
 
   const handleSelect = useCallback(
-    (code: TargetLanguageCode) => {
-      // Chỉ đổi mặc định cho lần mở app sau — KHÔNG đổi targetLanguage đang dùng.
-      setDefaultTargetLang(code);
-      // Giữ màn một nhịp để thấy dấu ✓, rồi quay lại.
+    (code: string) => {
+      // Store tự lưu mặc định và tự hoán đổi đích nếu trùng nguồn.
+      setSourceLang(code);
+      // Giữ màn một nhịp để thấy dấu ✓ chuyển, rồi quay lại.
       if (goBackTimeoutRef.current) clearTimeout(goBackTimeoutRef.current);
       goBackTimeoutRef.current = setTimeout(() => {
         navigation.goBack();
       }, GO_BACK_DELAY_MS);
     },
-    [setDefaultTargetLang, navigation],
+    [setSourceLang, navigation],
   );
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<LanguageItem>) => (
       <LanguageRow
-        label={item.label}
-        selected={item.code === defaultTargetLang}
-        onPress={() => handleSelect(item.code as TargetLanguageCode)}
+        label={getSourceFullLabel(item.code)}
+        selected={item.code === inputLanguage}
+        onPress={() => handleSelect(item.code)}
       />
     ),
-    [defaultTargetLang, handleSelect],
+    [inputLanguage, handleSelect],
   );
 
   return (
@@ -73,7 +72,7 @@ export default function DefaultLanguageScreen({
         {/* ── HEADER ── */}
         <View style={{ paddingTop: insets.top + vs(8) }}>
           <ScreenHeader
-            title={strings.defaultLanguage.title}
+            title={strings.sourceLanguage.title}
             onBack={() => navigation.goBack()}
           />
         </View>
@@ -85,7 +84,7 @@ export default function DefaultLanguageScreen({
             { color: colors.textSecondary, marginTop: vs(18) },
           ]}
         >
-          {strings.defaultLanguage.description}
+          {strings.sourceLanguage.description}
         </ThemedText>
 
         {/* ── NHÃN SECTION ── */}
@@ -95,12 +94,12 @@ export default function DefaultLanguageScreen({
             { color: colors.textSecondary, marginTop: vs(22) },
           ]}
         >
-          {strings.defaultLanguage.section}
+          {strings.sourceLanguage.section}
         </ThemedText>
 
         {/* ── DANH SÁCH ── */}
         <FlatList
-          data={TARGET_LANGUAGES}
+          data={SOURCE_LANGUAGES}
           keyExtractor={(item) => item.code}
           renderItem={renderItem}
           style={{ marginTop: vs(10) }}

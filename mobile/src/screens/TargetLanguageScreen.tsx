@@ -2,7 +2,6 @@ import React, { useCallback } from 'react';
 import {
   View,
   FlatList,
-  Pressable,
   StyleSheet,
   ListRenderItemInfo,
 } from 'react-native';
@@ -13,7 +12,7 @@ import ThemedText from '../theme/ThemedText';
 import ScreenHeader from '../components/ScreenHeader';
 import LanguageRow from '../components/LanguageRow';
 import { strings } from '../constants/strings';
-import { TARGET_LANGUAGES } from '../constants/languages';
+import { TARGET_LANGUAGES, getTargetFullLabel } from '../constants/languages';
 import { useTranslationStore } from '../store/translationStore';
 import { s, vs, ms, MAX_CONTENT_WIDTH } from '../utils/scale';
 
@@ -25,6 +24,7 @@ export default function TargetLanguageScreen({
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const targetLanguage = useTranslationStore((st) => st.targetLanguage);
+  const inputLanguage = useTranslationStore((st) => st.inputLanguage);
   const setTargetLang = useTranslationStore((st) => st.setTargetLang);
 
   const handleSelect = useCallback(
@@ -38,12 +38,16 @@ export default function TargetLanguageScreen({
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<LanguageItem>) => (
       <LanguageRow
-        label={item.label}
+        label={getTargetFullLabel(item.code)}
         selected={item.code === targetLanguage}
+        // Không ẩn hàng trùng nguồn: chọn nó sẽ hoán đổi hai bên.
+        subtitle={
+          item.code === inputLanguage ? strings.targetLanguage.isSourceHint : undefined
+        }
         onPress={() => handleSelect(item.code)}
       />
     ),
-    [targetLanguage, handleSelect],
+    [targetLanguage, inputLanguage, handleSelect],
   );
 
   return (
@@ -78,20 +82,6 @@ export default function TargetLanguageScreen({
             paddingBottom: vs(24) + insets.bottom,
           }}
           ItemSeparatorComponent={() => <View style={{ height: vs(3) }} />}
-          ListFooterComponent={
-            <Pressable
-              onPress={() => navigation.navigate('DefaultLanguage')}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.footerLink,
-                { marginTop: vs(28), opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <ThemedText style={[styles.footerLinkText, { color: colors.primary }]}>
-                {strings.targetLanguage.setDefault}
-              </ThemedText>
-            </Pressable>
-          }
         />
       </View>
     </View>
@@ -115,15 +105,5 @@ const styles = StyleSheet.create({
     fontSize: ms(14),
     fontWeight: '700',
     paddingLeft: s(19),
-  },
-
-  // ── Link cuối danh sách ──
-  footerLink: {
-    alignItems: 'center',
-    paddingVertical: vs(8),
-  },
-  footerLinkText: {
-    fontSize: ms(15),
-    fontWeight: '700',
   },
 });
