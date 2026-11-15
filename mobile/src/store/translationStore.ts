@@ -12,12 +12,19 @@ import {
   stopLiveAudioCapture,
 } from '../services/liveAudio';
 import { supportsSpeechToText } from '../constants/languages';
+import { strings } from '../constants/strings';
+import { buildContext } from '../utils/buildContext';
+import { useSettingsStore } from './settingsStore';
 
 // ──────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────
 
 type InputMode = 'text' | 'voice' | 'image';
+
+export type ToneId = 'formal' | 'friendly' | 'academic' | 'business';
+
+type Phase = 'idle' | 'translating' | 'result' | 'error';
 
 export interface TranslationState {
   // ── Input ──
@@ -43,6 +50,14 @@ export interface TranslationState {
   isStreaming: boolean;
   error: string | null;
 
+  // ── UI state (giao diện mới) ──
+  phase: Phase;
+  tones: ToneId[];
+  contextNote: string;
+  contextOpen: boolean;
+  translateError: string | null;
+  pendingAutoTranslate: boolean;
+
   // ── Actions ──
   setInputMode: (mode: InputMode) => void;
   setInputLanguage: (lang: string) => void;
@@ -51,6 +66,7 @@ export interface TranslationState {
   setTargetLanguage: (lang: string) => void;
   transcribeAudio: (audioUri: string) => Promise<void>;
   processImage: (imageUri: string) => Promise<void>;
+  runOcrOnly: (imageUri: string) => Promise<string>;
   translate: () => Promise<void>;
   setReferenceAudio: (uri: string) => void;
   synthesize: () => Promise<void>;
@@ -59,6 +75,17 @@ export interface TranslationState {
   sendStreamingAudio: (chunk: ArrayBuffer | Uint8Array) => void;
   clearError: () => void;
   reset: () => void;
+
+  // ── Actions (giao diện mới) ──
+  setText: (text: string) => void;
+  clearText: () => void;
+  toggleTone: (tone: ToneId) => void;
+  setContextNote: (note: string) => void;
+  toggleContext: () => void;
+  setContextOpen: (open: boolean) => void;
+  setTargetLang: (code: string) => void;
+  requestAutoTranslate: (text: string) => void;
+  consumeAutoTranslate: () => boolean;
 }
 
 // ──────────────────────────────────────────────
@@ -84,6 +111,12 @@ const initialState = {
   isSynthesizing: false,
   isStreaming: false,
   error: null as string | null,
+  phase: 'idle' as Phase,
+  tones: [] as ToneId[],
+  contextNote: '',
+  contextOpen: false,
+  translateError: null as string | null,
+  pendingAutoTranslate: false,
 };
 
 // ──────────────────────────────────────────────
@@ -153,26 +186,44 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
     }
   },
 
+  runOcrOnly: async (imageUri: string): Promise<string> => {
+    // Chỉ gọi OCR và trả về chữ đã nhận dạng — KHÔNG ghi vào store, KHÔNG dịch.
+    const { targetLanguage } = get();
+    const result = await apiOcrImage(imageUri, targetLanguage || undefined);
+    return (result.extracted_text ?? '').trim();
+  },
+
   translate: async () => {
-    const { vietnameseText, inputLanguage, targetLanguage, context } = get();
+    const { vietnameseText, targetLanguage, tones, contextNote } = get();
     if (!vietnameseText.trim()) {
-      set({ error: 'Please enter or record input text first.' });
+      set({ phase: 'error', translateError: strings.error.generic });
       return;
     }
-    set({ isTranslating: true, error: null, translatedText: '' });
+
+    const { context, contextPreset } = buildContext(tones, contextNote);
+
+    set({
+      isTranslating: true,
+      phase: 'translating',
+      translateError: null,
+      translatedText: '',
+    });
     try {
       const result = await apiTranslateText(
         vietnameseText,
         targetLanguage,
-        inputLanguage,
+        'vi',
         context || undefined,
+        contextPreset,
       );
       set({
         translatedText: result.translated_text,
         sourceLanguage: result.source_language,
+        phase: 'result',
       });
     } catch (e: unknown) {
-      set({ error: extractErrorMessage(e, 'Translation failed.') });
+      const message = classifyTranslateError(e);
+      set({ phase: 'error', translateError: message });
     } finally {
       set({ isTranslating: false });
     }
@@ -332,11 +383,127 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
     }
     set({ ...initialState });
   },
+
+  // ── Actions (giao diện mới) ──
+
+  setText: (text) => {
+    const { phase } = get();
+    if (phase === 'result' || phase === 'error') {
+      set({ vietnameseText: text, phase: 'idle', translatedText: '', translateError: null });
+    } else {
+      set({ vietnameseText: text });
+    }
+  },
+
+  clearText: () =>
+    set({
+      vietnameseText: '',
+      translatedText: '',
+      translateError: null,
+      phase: 'idle',
+    }),
+
+  toggleTone: (tone) => {
+    const { tones, phase } = get();
+    const next = tones.includes(tone)
+      ? tones.filter((t) => t !== tone)
+      : [...tones, tone];
+    if (phase === 'result' || phase === 'error') {
+      set({ tones: next, phase: 'idle', translatedText: '', translateError: null });
+    } else {
+      set({ tones: next });
+    }
+  },
+
+  setContextNote: (note) => {
+    const trimmed = note.slice(0, 200);
+    const { phase } = get();
+    if (phase === 'result' || phase === 'error') {
+      set({ contextNote: trimmed, phase: 'idle', translatedText: '', translateError: null });
+    } else {
+      set({ contextNote: trimmed });
+    }
+  },
+
+  toggleContext: () => set((state) => ({ contextOpen: !state.contextOpen })),
+
+  setContextOpen: (open) => set({ contextOpen: open }),
+
+  setTargetLang: (code) => {
+    const { phase } = get();
+    if (phase === 'result' || phase === 'error') {
+      set({ targetLanguage: code, phase: 'idle', translatedText: '', translateError: null });
+    } else {
+      set({ targetLanguage: code });
+    }
+  },
+
+  requestAutoTranslate: (text) =>
+    set({ vietnameseText: text, pendingAutoTranslate: true }),
+
+  consumeAutoTranslate: () => {
+    const prev = get().pendingAutoTranslate;
+    set({ pendingAutoTranslate: false });
+    return prev;
+  },
 }));
 
 // ──────────────────────────────────────────────
 // Utility
 // ──────────────────────────────────────────────
+
+/**
+ * Kiểm tra lỗi có phải do mạng (axios error không có response, hoặc
+ * code ECONNABORTED/ERR_NETWORK). Dùng chung cho nhiều màn.
+ */
+export function isNetworkError(e: unknown): boolean {
+  if (
+    typeof e === 'object' &&
+    e !== null &&
+    'isAxiosError' in e &&
+    (e as { isAxiosError: boolean }).isAxiosError
+  ) {
+    const axiosErr = e as {
+      code?: string;
+      response?: unknown;
+    };
+    return (
+      !axiosErr.response ||
+      axiosErr.code === 'ECONNABORTED' ||
+      axiosErr.code === 'ERR_NETWORK'
+    );
+  }
+  return false;
+}
+
+/**
+ * Phân loại lỗi dịch: lỗi mạng vs lỗi server vs lỗi chung.
+ */
+function classifyTranslateError(e: unknown): string {
+  if (
+    typeof e === 'object' &&
+    e !== null &&
+    'isAxiosError' in e &&
+    (e as { isAxiosError: boolean }).isAxiosError
+  ) {
+    // Lỗi mạng: không có response (mất kết nối) hoặc code network/timeout.
+    if (isNetworkError(e)) {
+      return strings.error.network;
+    }
+    // Có response → lấy detail/message từ server.
+    return extractErrorMessage(e, strings.error.generic);
+  }
+  return strings.error.generic;
+}
+
+/**
+ * Đọc cài đặt mặc định từ settingsStore (sau khi hydrate) và áp vào
+ * translationStore. Gọi 1 lần khi app khởi động.
+ */
+export function applyDefaultsFromSettings(): void {
+  const { defaultTargetLang } = useSettingsStore.getState();
+  useTranslationStore.setState({ targetLanguage: defaultTargetLang });
+}
 
 function extractErrorMessage(e: unknown, fallback: string): string {
   if (typeof e === 'object' && e !== null) {
