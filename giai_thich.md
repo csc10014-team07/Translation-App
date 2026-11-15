@@ -67,12 +67,17 @@ server bên thứ ba (trừ 2 ngoại lệ có ghi chú rõ: Edge-TTS và Cloudf
 ```mermaid
 graph TD
     subgraph Client["📱 TẦNG 1 — Điện thoại (React Native Expo)"]
-        UI["Giao diện: TranslationScreen.tsx"]
+        UI["Giao diện V2: HomeScreen + 4 màn phụ<br/>(chọn ngôn ngữ, nghe, camera)"]
         STORE["Bộ nhớ trạng thái: translationStore.ts (Zustand)"]
-        REST["api.ts — gọi REST (axios)"]
-        WS["stream.ts — WebSocket client"]
-        MIC["liveAudio.ts — thu micro PCM"]
+        SETTINGS["settingsStore.ts — lưu ngôn ngữ nguồn + theme"]
+        THEME["theme/ThemeProvider.tsx — sáng/tối toàn app"]
+        REST["services/api.ts — gọi REST (axios)"]
+        WS["services/stream.ts — WebSocket client"]
+        MIC["services/liveAudio.ts — thu micro PCM"]
         UI --> STORE
+        UI --> THEME
+        THEME --> SETTINGS
+        STORE --> SETTINGS
         STORE --> REST
         STORE --> WS
         WS --> MIC
@@ -140,6 +145,53 @@ sequenceDiagram
 > rồi giữ trong RAM/VRAM để phục vụ nhiều request. Việc load lại mỗi request sẽ
 > cực kỳ chậm (mỗi model 4B mất hàng chục giây).
 
+### 2.3 Bản đồ màn hình Mobile (V2)
+
+```mermaid
+graph TD
+    HOME["🏠 HomeScreen.tsx<br/>ô nhập chữ · chip giọng văn · nút Dịch · thẻ kết quả"]
+    HOME -->|nút 'Dịch từ'| SRC["SourceLanguageScreen<br/>chọn ngôn ngữ nguồn"]
+    HOME -->|nút 'Dịch sang'| TGT["TargetLanguageScreen<br/>chọn ngôn ngữ đích"]
+    HOME -->|nút micro| VOICE["VoiceListeningScreen<br/>(modal, trượt từ dưới lên)"]
+    HOME -->|nút camera| CAM["CameraScreen<br/>(modal, trượt từ dưới lên)"]
+    SRC -->|chọn xong| HOME
+    TGT -->|chọn xong| HOME
+    VOICE -->|chữ nhận được| HOME
+    CAM -->|chữ đọc từ ảnh| HOME
+```
+
+**Đọc sơ đồ:** mọi đường đi đều **bắt đầu và quay về `HomeScreen`**. Các màn phụ chỉ
+làm một việc rồi trả kết quả về Home.
+
+> **Khác V1 thế nào?** V1 chỉ có 1 màn hình duy nhất (`TranslationScreen`) với 3 tab
+> Text/Voice/Image ngay trong trang. V2 tách thành màn riêng cho từng chức năng, dễ
+> kiểm soát giao diện và bố cục hơn.
+
+### 2.4 "Công tắc khả năng" — vì sao UI tự ẩn nút
+
+Điểm đặc trưng của V2: **giao diện thay đổi theo ngôn ngữ đang chọn**. Tất cả dựa vào
+3 hàm trong `mobile/src/constants/languages.ts`:
+
+```mermaid
+graph LR
+    CAT["LANGUAGE_CATALOG<br/>(11 ngôn ngữ + cờ khả năng)"] --> F1["supportsSpeechToText(code)"]
+    CAT --> F2["supportsOcr(code)"]
+    CAT --> F3["supportsTts(code)"]
+    F1 -->|false| H1["Ẩn nút micro ở Home/HomeScreen<br/>+ gợi ý vàng tự ẩn 3 giây"]
+    F2 -->|false| H2["Ẩn nút camera, không cho mở CameraScreen"]
+    F3 -->|false| H3["Ẩn nút 🔊 đọc bản dịch"]
+```
+
+| Khả năng | Ngôn ngữ được bật | Vì sao |
+| :--- | :--- | :--- |
+| Nghe (STT) | **chỉ `vi`** | PhoASR là model tiếng Việt |
+| OCR | `vi`, `en`, `ja`, `zh` | `detect_language()` của OCR chỉ trả 4 mã này |
+| Đọc to (TTS) | **cả 11** | TTS có giọng cho mọi ngôn ngữ đích |
+
+- **Nếu bỏ các hàm này:** UI cứ hiện nút, người dùng bấm rồi nhận lỗi từ backend
+  (ví dụ micro với nguồn "Japanese") — trải nghiệm kém và khó hiểu.
+- Nguồn xác nhận khả năng thật của backend: `docs/language-support.md`.
+
 ---
 
 ## 3. Bản đồ file
@@ -183,7 +235,7 @@ Translation-App/
 │   │   │   ├── ocr_adapter.py         # Bọc RapidOCR
 │   │   │   └── tts_adapter.py         # Bọc Pocket TTS + Edge-TTS
 │   │   └── schemas/           # Định nghĩa dữ liệu vào/ra (Pydantic)
-│   │       ├── asr.py, ocr.py, translate.py, tts.py, health.py
+│   │       └── asr.py, ocr.py, translate.py, tts.py, health.py
 │   ├── scripts/
 │   │   ├── start_tunnel_and_server.py  # ⭐ Launcher tổng
 │   │   ├── download_models.py          # Tải model
@@ -192,21 +244,55 @@ Translation-App/
 │   └── tests/                 # 10 file test tự động
 │
 └── mobile/                    # 📱 ỨNG DỤNG ĐIỆN THOẠI
-    ├── App.tsx                # Điểm vào React Native
+    ├── App.tsx                # Điểm vào: nạp font, ThemeProvider, NavigationContainer
     ├── app.json               # Cấu hình Expo (quyền micro/camera...)
+    ├── MANUAL_QA.md           # Checklist kiểm tra giao diện V2 bằng tay
     ├── package.json           # Thư viện JS
     └── src/
-        ├── config/api.ts      # ⭐ URL server (tự sinh bởi launcher)
-        ├── navigation/AppNavigator.tsx
-        ├── screens/TranslationScreen.tsx  # ⭐ Màn hình chính
-        ├── store/translationStore.ts      # ⭐ Não bộ trạng thái
+        ├── config/api.ts      # ⭐ URL server (tự sinh bởi launcher — ĐỪNG sửa tay)
+        ├── navigation/
+        │   ├── AppNavigator.tsx   # 5 màn hình (Home + 4 màn phụ)
+        │   └── types.ts           # Kiểu tham số điều hướng
+        ├── screens/           # ⭐ Nơi chứa các màn hình
+        │   ├── HomeScreen.tsx         # ⭐ Màn chính kiểu V2
+        │   ├── SourceLanguageScreen.tsx  # Chọn "Dịch từ"
+        │   ├── TargetLanguageScreen.tsx  # Chọn "Dịch sang"
+        │   ├── VoiceListeningScreen.tsx  # Nghe trực tiếp / ghi rồi nhận dạng
+        │   └── CameraScreen.tsx          # Chụp/quét ảnh OCR
+        ├── store/             # ⭐ Não bộ trạng thái (Zustand)
+        │   ├── translationStore.ts   # State dịch thuật + streaming
+        │   └── settingsStore.ts      # Cài đặt lưu bền (ngôn ngữ nguồn, theme)
         ├── services/
-        │   ├── api.ts         # Gọi REST
+        │   ├── api.ts         # Gọi REST (axios)
         │   ├── stream.ts      # WebSocket client
         │   └── liveAudio.ts   # Thu PCM từ micro
-        ├── components/        # 7 component giao diện
-        └── constants/languages.ts  # Danh sách ngôn ngữ
+        ├── hooks/
+        │   ├── useSpeech.ts          # Logic đọc to (TTS)
+        │   └── useVoiceRecording.ts  # Ghi âm "ghi rồi nhận dạng"
+        ├── theme/             # ⭐ Hệ thống giao diện dùng chung
+        │   ├── ThemeProvider.tsx  # Bơm màu sáng/tối cho cả app
+        │   ├── colors.ts          # Bảng màu light/dark + màu camera
+        │   ├── typography.ts      # Cỡ chữ (font Be Vietnam Pro)
+        │   └── ThemedText.tsx     # Component chữ tự đổi màu theo theme
+        ├── components/        # Component giao diện dùng lại
+        │   ├── LanguageTile.tsx / LanguageRow.tsx   # Ô/hàng chọn ngôn ngữ
+        │   ├── PrimaryButton / OutlineButton / IconCircleButton
+        │   ├── ToneChip / ErrorCard / ScreenHeader / Waveform / CornerFrame
+        │   └── (legacy: TranslationScreen.tsx dùng các file V1 cũ — xem §6.10)
+        ├── constants/
+        │   ├── languages.ts   # ⭐ Nguồn chân lý về ngôn ngữ + khả năng
+        │   └── strings.ts     # Toàn bộ chuỗi tiếng Việt
+        └── utils/
+            ├── scale.ts       # s()/vs()/ms() — co giãn theo màn hình
+            └── buildContext.ts # Ghép "giọng văn" + ghi chú thành ngữ cảnh
 ```
+
+> **Ghi chú về "legacy":** các file `TranslationScreen.tsx`, `LanguagePicker.tsx`,
+> `TranslationResult.tsx`, `VoiceRecorder.tsx`, `ImagePickerButton.tsx`,
+> `InputModeSelector.tsx`, `ContextInput.tsx`, `VoiceCloningPanel.tsx`,
+> `PlaceholderScreen.tsx`, `Card.tsx` là giao diện **V1 cũ**. Chúng được **giữ lại để tham khảo**
+> nhưng **không còn được điều hướng tới** (không màn hình V2 nào import). Đầu mỗi file có
+> dòng: *"Deprecated: thay bởi giao diện V2. Giữ để tham khảo."*
 
 ### 3.2 Bảng tra nhanh "tôi muốn sửa X thì vào đâu?"
 
@@ -216,7 +302,12 @@ Translation-App/
 | Đổi model dịch / câu lệnh prompt | `backend/app/models/translation_adapter.py` |
 | Thêm ngôn ngữ mới | `mobile/src/constants/languages.ts` + `tts_adapter.py` |
 | Đổi ngưỡng nhận biết giọng nói (VAD) | `backend/app/api/routes/stream.py` → class `VADSettings` |
-| Đổi giao diện màn hình | `mobile/src/screens/TranslationScreen.tsx` |
+| Đổi giao diện màn hình chính | `mobile/src/screens/HomeScreen.tsx` |
+| Đổi màn chọn ngôn ngữ | `mobile/src/screens/SourceLanguageScreen.tsx` / `TargetLanguageScreen.tsx` |
+| Đổi màn nghe / camera | `mobile/src/screens/VoiceListeningScreen.tsx` / `CameraScreen.tsx` |
+| Đổi màu sắc / chữ cả app | `mobile/src/theme/colors.ts` / `typography.ts` |
+| Đổi câu chữ tiếng Việt trong app | `mobile/src/constants/strings.ts` |
+| Đổi ngôn ngữ mặc định khi mở app | `mobile/src/constants/languages.ts` (`DEFAULT_SOURCE_CODE`) |
 | Thêm endpoint API mới | Tạo file trong `backend/app/api/routes/` rồi đăng ký ở `main.py` |
 | Đổi cổng/quyền của app điện thoại | `mobile/app.json` |
 
@@ -232,15 +323,16 @@ Phần này là **quan trọng nhất** để hiểu "file này liên kết file
 sequenceDiagram
     autonumber
     participant U as Người dùng
-    participant S as TranslationScreen.tsx
+    participant S as HomeScreen.tsx
     participant Z as translationStore.ts
     participant A as services/api.ts
     participant R as routes/translate.py
     participant T as translation_adapter.py
     participant G as llm (TranslateGemma)
 
-    U->>S: Gõ chữ, bấm "Translate"
+    U->>S: Gõ chữ, chọn giọng văn, bấm "Dịch"
     S->>Z: gọi translate()
+    Z->>Z: buildContext(tones, note) → context
     Z->>A: apiTranslateText(text, target, source, context)
     A->>R: POST /api/translate (JSON)
     R->>R: kiểm tra text không rỗng
@@ -252,11 +344,15 @@ sequenceDiagram
     R-->>A: TranslateResponse (JSON)
     A-->>Z: set({translatedText})
     Z-->>S: React re-render
-    S-->>U: Hiện bản dịch trong TranslationResult
+    S-->>U: Hiện bản dịch (thẻ kết quả) + nút 🔊 nếu ngôn ngữ đích hỗ trợ TTS
 ```
 
-**Chuỗi file:** `TranslationScreen.tsx` → `translationStore.ts` → `services/api.ts`
+**Chuỗi file:** `HomeScreen.tsx` → `translationStore.ts` → `services/api.ts`
 → (mạng) → `routes/translate.py` → `models/translation_adapter.py` → model.
+
+> **So với V1:** trước đây chỗ `HomeScreen` là `TranslationScreen`, và ngữ cảnh do người
+> dùng gõ tay. V2 thay bằng các **chip giọng văn** (Trang trọng / Thân mật / Học thuật /
+> Kinh doanh) + ô ghi chú; `utils/buildContext.ts` ghép chúng thành chuỗi `context`.
 
 ### 4.2 Luồng 2 — Ghi âm giọng nói rồi dịch (ASR)
 
@@ -264,15 +360,18 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant U as Người dùng
-    participant V as VoiceRecorder.tsx
+    participant S as VoiceListeningScreen.tsx
+    participant V as useVoiceRecording.ts
     participant Z as translationStore.ts
     participant A as services/api.ts
     participant R as routes/asr.py
     participant P as asr_adapter.py
 
-    U->>V: Giữ nút micro, nói, thả
+    U->>S: Bấm micro, nói, bấm dừng
+    S->>V: start() / stop()
     V->>V: expo-av ghi ra file .m4a
-    V->>Z: onRecordingComplete(uri)
+    V-->>S: uri file ghi âm
+    S->>Z: gọi translate({ audioUri }) hoặc transcribe rồi dịch
     Z->>A: apiTranscribeAudio(uri)
     A->>R: POST /api/asr (multipart, field "audio")
     R->>R: kiểm tra đuôi file + kích thước + thời lượng
@@ -281,21 +380,29 @@ sequenceDiagram
     P-->>R: {"text": "...", "duration": ...}
     R-->>A: ASRResponse
     A-->>Z: set({vietnameseText: text})
-    Z-->>U: Chữ hiện ra, sẵn sàng để dịch
+    Z-->>S: React re-render
+    S-->>U: Chữ hiện ra, dịch tiếp sang ngôn ngữ đích
 ```
+
+> **Hai chế độ trong `VoiceListeningScreen`:**
+> - **Nghe trực tiếp** (chỉ khi có module native + ngôn ngữ nguồn hỗ trợ STT):
+>   `services/liveAudio.ts` thu PCM 100 ms/gói và `services/stream.ts` đẩy lên
+>   `/ws/stream` — xem §4.4.
+> - **Ghi rồi nhận dạng** (mặc định ở Expo Go): dùng `useVoiceRecording` ghi ra file,
+>   bấm dừng mới gọi `POST /api/asr`. Chữ chỉ hiện **sau khi dừng**, không realtime.
 
 ### 4.3 Luồng 3 — Dịch ảnh (OCR 2 giai đoạn)
 
 ```mermaid
 flowchart LR
-    A["Ảnh chụp"] --> B["ImagePickerButton.tsx<br/>(expo-image-picker)"]
-    B --> C["translationStore.processImage(uri)"]
+    A["Ảnh chụp / thư viện"] --> B["CameraScreen.tsx<br/>(expo-camera / expo-image-picker)"]
+    B --> C["translationStore.processImage(uri, language)"]
     C --> D["POST /api/ocr"]
     D --> E["Giai đoạn 1: RapidOCR<br/>đọc chữ ra khỏi ảnh"]
-    E --> F["detect_language()<br/>đoán ngôn ngữ"]
+    E --> F["detect_language()<br/>đoán ngôn ngữ (vi/en/ja/zh)"]
     F --> G["Giai đoạn 2: TranslateGemma<br/>dịch văn bản vừa đọc"]
     G --> H["OCRResponse<br/>extracted_text + translated_text"]
-    H --> I["Hiện trên TranslationScreen"]
+    H --> I["Hiện trên HomeScreen (thẻ kết quả)"]
 ```
 
 > **"Hai giai đoạn" (two-stage) nghĩa là gì?** Giai đoạn 1 chỉ *đọc chữ* (không hiểu
@@ -1010,30 +1117,68 @@ Không có khối này: worker "ma" tiếp tục giữ model sau khi client tho�
 
 ## 6. Mobile chi tiết
 
-### 6.1 `mobile/App.tsx` — Điểm vào (16 dòng)
+### 6.1 `mobile/App.tsx` — Điểm vào (65 dòng)
 
 ```tsx
+function AppContent() {
+  const { mode, colors } = useTheme();                     // đọc theme hiện tại
+  const [fontsLoaded] = useFonts({ BeVietnamPro_400Regular, ... });  // nạp font
+  const navTheme = useMemo(() => ({ ...DefaultTheme, dark: mode === 'dark',
+    colors: { ...DefaultTheme.colors, background: colors.background } }), [mode, colors]);
+
+  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  return (
+    <NavigationContainer theme={navTheme}>
+      <AppNavigator />
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <AppNavigator />
-      </NavigationContainer>
+      <ThemeProvider>            {/* ⭐ bọc ngoài cùng: mọi màn hình đọc được màu */}
+        <AppContent />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 ```
+
 - `SafeAreaProvider`: tránh "notch"/tai thỏ che nội dung.
-- `NavigationContainer`: bọc cho hệ thống điều hướng (React Navigation).
-- Cây component này là gốc; mọi thứ khác nằm trong `AppNavigator`.
+- **`ThemeProvider` (mới ở V2)** bọc ngoài `NavigationContainer`. Nhờ vậy mọi màn hình
+  bên trong gọi `useTheme()` để lấy màu sáng/tối hiện tại.
+- `useFonts(...)`: nạp 4 font Be Vietnam Pro. Trong lúc chưa nạp xong, `AppContent`
+  trả về một `View` nền cùng màu → **không chớp trắng** khi mở app.
+- `navTheme`: đẩy màu nền theme app vào React Navigation để màn hình chuyển tiếp
+  (animation) cũng đúng màu, không lộ nền trắng.
+- **Nếu bỏ `ThemeProvider`:** mọi `useTheme()` bên dưới ném lỗi "must be inside a
+  provider" → app trắng màn hình ngay lập tức.
 
-### 6.2 `mobile/src/navigation/AppNavigator.tsx` — Điều hướng (31 dòng)
+### 6.2 `mobile/src/navigation/` — Điều hướng 5 màn hình
 
-Dùng `createStackNavigator` với **duy nhất 1 màn hình** (`Translation`).
-Cấu trúc đã sẵn sàng để thêm màn hình thứ 2 (Settings, History...) sau này:
-chỉ cần thêm `<Stack.Screen>` mới. Header màu `#4F46E5` (tím indigo) — màu thương hiệu
-dùng xuyên suốt app.
+`AppNavigator.tsx` dùng `createNativeStackNavigator` với **5 màn hình**:
+
+```tsx
+<Stack.Screen name="Home"           component={HomeScreen} />            // màn chính
+<Stack.Screen name="TargetLanguage" component={TargetLanguageScreen} />
+<Stack.Screen name="SourceLanguage" component={SourceLanguageScreen} />
+<Stack.Screen name="VoiceListening" component={VoiceListeningScreen}
+              options={{ animation: 'slide_from_bottom' }} />            // kiểu modal
+<Stack.Screen name="Camera"         component={CameraScreen}
+              options={{ animation: 'slide_from_bottom' }} />            // kiểu modal
+```
+
+- `headerShown: false`: mỗi màn **tự vẽ header riêng** (component `ScreenHeader`), để
+  kiểm soát 100% giao diện.
+- `contentStyle.backgroundColor = colors.background`: nền màn hình luôn khớp theme,
+  kể cả lúc đang trượt vào.
+- **`navigation/types.ts`** định nghĩa `RootStackParamList` — kiểu tham số cho từng
+  màn. Nhờ đó `navigation.navigate('VoiceListening', { mode })` được TypeScript kiểm tra;
+  gõ sai tên màn hình là **lỗi biên dịch**, không phải lỗi lúc chạy.
+- **Nếu bỏ navigator:** chỉ còn 1 màn hình, không cách nào mở màn chọn ngôn ngữ,
+  nghe hay camera.
+
 
 ### 6.3 `mobile/src/config/api.ts` — "Địa chỉ nhà" (4 dòng)
 
@@ -1041,11 +1186,12 @@ dùng xuyên suốt app.
 export const API_BASE_URL = 'https://fluid-events-otherwise-postposted.trycloudflare.com';
 export const WS_BASE_URL = 'wss://fluid-events-otherwise-postposted.trycloudflare.com/ws/stream';
 ```
-- **File này bị tự động ghi đè** mỗi lần chạy `start_tunnel_and_server.py`. Đừng sửa tay.
+- **File này bị tự động ghi đè** mỗi lần chạy `start_tunnel_and_server.py`. **Đừng sửa tay** —
+  sửa xong lần chạy sau sẽ bị ghi đè mất.
 - Đây là **mối nối duy nhất** giữa mobile và backend: đổi URL ở đây là đổi server.
 - **Nếu bỏ:** `services/api.ts` không biết gọi tới đâu; mọi request lỗi mạng.
 
-### 6.4 `mobile/src/services/api.ts` — Cửa gọi REST (262 dòng)
+### 6.4 `mobile/src/services/api.ts` — Cửa gọi REST (296 dòng)
 
 **Tạo client axios 1 lần:**
 ```ts
@@ -1067,6 +1213,9 @@ const proto = isHttps ? 'wss://' : 'ws://';
 tùy chọn `reference_audio`). Mỗi hàm khớp 1-1 với 1 route backend — đây là các "seam"
 mà CODING_STANDARDS.md yêu cầu phải khớp.
 
+> **V2:** khi hàm nào cần "ngôn ngữ nguồn mặc định" (ví dụ khi không truyền vào), nó dùng
+> hằng `DEFAULT_SOURCE_CODE` từ `constants/languages.ts` thay vì viết cứng `'vi'`.
+
 **`saveBase64Audio()` — nhận audio từ server, lưu thành file:**
 ```ts
 const uri = `${FileSystem.cacheDirectory}tts_output_${timestamp}.${ext}`;
@@ -1080,7 +1229,7 @@ for (const file of ttsFiles) {
 - Việc dọn file cũ ngăn **rò rỉ dung lượng** sau nhiều lần dịch. Đóng gói trong
   `try/catch` — lỗi dọn dẹp không được làm hỏng luồng chính.
 
-### 6.5 `mobile/src/services/stream.ts` — WebSocket client (162 dòng)
+### 6.5 `mobile/src/services/stream.ts` — WebSocket client (166 dòng)
 
 ```ts
 export class StreamClient {
@@ -1095,6 +1244,8 @@ export class StreamClient {
 ```
 - Khi mở kết nối, **gửi ngay handshake `{action:"start"}`** kèm ngôn ngữ + ngữ cảnh.
   Đây là "lời chào" để server biết cấu hình phiên.
+- `sourceLang`/`targetLang` mặc định lấy từ `DEFAULT_SOURCE_CODE`/`DEFAULT_TARGET_CODE`
+  (V2), không còn viết cứng `'vi'`/`'en'`.
 - `switch (data.event)` phân loại 6 loại sự kiện server gửi về:
   `asr_interim`, `asr_final`, `trans_delta`, `trans_final`, `tts_audio`, `error`
   — mỗi loại gọi callback tương ứng (do Store truyền vào).
@@ -1144,33 +1295,62 @@ if (generation !== captureGeneration) return;   // đã bị huỷ trong lúc ch
   `captureGeneration` tăng lên → code cũ tự thoát, không mở micro "ma".
 - **Nếu bỏ:** micro có thể bật lén sau khi người dùng đã dừng — lỗi quyền riêng tư.
 
-### 6.7 `mobile/src/store/translationStore.ts` — Não bộ trạng thái (360 dòng)
+### 6.7 `mobile/src/store/translationStore.ts` — Não bộ trạng thái (596 dòng)
 
 Đây là **file trung tâm của mobile**. Dùng Zustand — thư viện quản lý state nhẹ.
 
-**Cấu trúc state:**
+**Cấu trúc state (đã cập nhật theo V2):**
 ```ts
 {
-  inputMode: 'text'|'voice'|'image',    // đang nhập kiểu gì
-  inputLanguage, vietnameseText,        // đầu vào
-  context, targetLanguage,              // cấu hình dịch
-  translatedText, sourceLanguage,       // đầu ra
-  referenceAudioUri, synthesizedAudioUri, // file audio
+  inputMode: 'text'|'voice'|'image',   // đang nhập kiểu gì
+  inputLanguage,                       // ngôn ngữ nguồn đang chọn ("Dịch từ")
+  vietnameseText,                      // chữ đầu vào (kết quả ASR / OCR / gõ tay)
+  tones: ToneId[],                     // chip giọng văn (Trang trọng, Thân mật...)
+  note,                                // ghi chú ngữ cảnh người dùng thêm
+  targetLanguage,                      // ngôn ngữ đích ("Dịch sang")
+  translatedText, sourceLanguage,      // đầu ra
+  synthesizedAudioUri,                 // file audio TTS
   isTranscribing, isOcrProcessing, isTranslating, isSynthesizing, isStreaming,
   error,
 }
 ```
 - **Các cờ `isXxx` là "trạng thái bận"** — UI dùng để hiện spinner và vô hiệu hoá nút.
   Không có chúng, người dùng có thể bấm gửi 2 lần cùng lúc.
+- `ToneId`, `InputMode`, `Phase` được `export` để màn hình dùng chung — tránh mỗi nơi
+  định nghĩa một kiểu khác nhau.
+
+**Hai action "hoán đổi" ngôn ngữ (mới ở V2):**
+```ts
+setSourceLang: (code) => {
+  const { targetLanguage } = get();
+  if (code === targetLanguage) return;   // chặn trùng: nguồn ≠ đích
+  set({ inputLanguage: code });
+},
+setTargetLang: (code) => {
+  const { inputLanguage } = get();
+  if (code === inputLanguage) return;// chặn trùng: đích ≠ nguồn
+  set({ targetLanguage: code });
+},
+swapLanguages: () => {
+  const { inputLanguage, targetLanguage } = get();
+  set({ inputLanguage: targetLanguage, targetLanguage: inputLanguage });
+},
+```
+- **Vì sao chặn trùng?** Nếu nguồn = đích = "vi", model phải "dịch Việt→Việt" (vô nghĩa)
+  và còn phá logic STT/TTS. Kiểm tra ở tầng store đảm bảo **mọi đường vào** đều an toàn.
+- `swapLanguages` đổi chỗ hai chiều cùng lúc — dùng cho nút hoán đổi ở Home.
+- **`applyDefaultsFromSettings()`**: đọc `settingsStore.defaultSourceLang` rồi áp vào
+  `inputLanguage` khi app vừa mở. Đây là cầu nối giữa `settingsStore` và `translationStore`.
 
 **Mỗi action là một luồng async hoàn chỉnh, ví dụ `translate()`:**
 ```ts
 translate: async () => {
-  const { vietnameseText, inputLanguage, targetLanguage, context } = get();
+  const { vietnameseText, inputLanguage, targetLanguage, tones, note } = get();
   if (!vietnameseText.trim()) { set({ error: '...' }); return; }  // chặn sớm
+  const { context } = buildContext(tones, note);                  // ghép ngữ cảnh
   set({ isTranslating: true, error: null, translatedText: '' });
   try {
-    const result = await apiTranslateText(...);
+    const result = await apiTranslateText(vietnameseText, targetLanguage, inputLanguage, context);
     set({ translatedText: result.translated_text, sourceLanguage: result.source_language });
   } catch (e) {
     set({ error: extractErrorMessage(e, 'Translation failed.') });
@@ -1208,70 +1388,229 @@ if (typeof data['message'] === 'string') return data['message'];
 - FastAPI trả lỗi trong `response.data.detail`. Hàm này lấy chuỗi đó ra thay vì hiện
   "Request failed with status code 422" (vô nghĩa với người dùng).
 
-### 6.8 `mobile/src/screens/TranslationScreen.tsx` — Màn hình chính (475 dòng)
+### 6.8 `mobile/src/screens/HomeScreen.tsx` — Màn hình chính V2 (802 dòng)
 
-**Nhiệm vụ:** ghép mọi component lại và nối chúng với Store.
+Đây là **bộ mặt mới của app** (thay `TranslationScreen` cũ). Nhiệm vụ: ghép mọi
+component lại và nối chúng với Store.
+
+**Bố cục từ trên xuống:**
+1. **Hàng ngôn ngữ** — hai `LanguageTile` ("Dịch từ" / "Dịch sang") và nút hoán đổi ở giữa.
+2. **Ô nhập chữ** — `TextInput` nhiều dòng + hai nút phụ: micro (sang `VoiceListening`)
+   và camera (sang `Camera`).
+3. **Chip giọng văn** — 4 `ToneChip`; khối ghi chú ngữ cảnh mở/gọn bằng `LayoutAnimation`.
+4. **Nút "Dịch"** — `PrimaryButton`.
+5. **Thẻ kết quả / thẻ lỗi** — hiện `translatedText` + nút 🔊 + nút Copy.
 
 ```tsx
-const { inputMode, vietnameseText, ..., translate, startStreaming, ... } = useTranslationStore();
+const { inputLanguage, targetLanguage, vietnameseText, tones, note,
+        translatedText, error, isTranslating,
+        translate, swapLanguages, setInputText, toggleTone, ... } = useTranslationStore();
 ```
-- Một dòng `useTranslationStore()` lấy ra **tất cả** state + action cần dùng.
 
-**Dọn dẹp khi app mất focus (quan trọng cho pin & quyền riêng tư):**
+**Nút micro & camera "biết tự ẩn" dựa trên khả năng ngôn ngữ (V2):**
+```tsx
+const canVoiceInput = supportsSpeechToText(inputLanguage);  // chỉ 'vi' → true
+const canOcr = supportsOcr(inputLanguage);                  // chỉ vi/en/ja/zh
+const canTts = supportsTts(targetLanguage);                 // cả 11 ngôn ngữ
+```
+- Nếu ngôn ngữ nguồn **không** hỗ trợ nghe, nút micro bị **ẩn**, và khi người dùng vô
+  tình chạm vào vùng đó, hiện **gợi ý vàng tự ẩn sau 3 giây** giải thích vì sao.
+- Nút 🔊 chỉ hiện khi `canTts` — tức là ngôn ngữ đích có giọng đọc.
+- **Nếu bỏ các kiểm tra này:** người dùng bấm micro trong khi chọn nguồn "Japanese"
+  sẽ nhận lỗi khó hiểu từ backend thay vì được giải thích ngay trên UI.
+
+**Dọn dẹp khi rời app (quan trọng cho pin & quyền riêng tư):**
 ```tsx
 useEffect(() => {
-  const subscription = AppState.addEventListener('change', (nextState) => {
-    if (nextState !== 'active') stopStreaming();   // rời app → tắt micro
-  });
-  return () => { subscription.remove(); stopStreaming(); };  // rời màn hình → tắt
+  const sub = AppState.addEventListener('change', (s) => { if (s !== 'active') stopStreaming(); });
+  return () => { sub.remove(); stopStreaming(); };
 }, [stopStreaming]);
 ```
 - **Nếu bỏ:** đóng app mà micro vẫn thu → tốn pin, và rò rỉ quyền riêng tư.
+- `useFocusEffect` (khác với `useEffect`) được dùng để nạp lại bản dịch/trạng thái mỗi
+  khi Home được **focus lại** — ví dụ sau khi chọn xong ngôn ngữ ở màn phụ quay về.
 
-**Render có điều kiện theo `inputMode`:** `inputMode === 'text'` → TextInput;
-`'voice'` → nút Live Stream + VoiceRecorder; `'image'` → ImagePickerButton.
-Đây là cơ chế "3 chế độ nhập" của app.
+### 6.9 Các màn hình phụ (V2)
 
-### 6.9 Bảy component giao diện
+| File | Nhiệm vụ | Điểm đáng chú ý |
+| :--- | :--- | :--- |
+| `SourceLanguageScreen.tsx` | Chọn "Dịch từ" | Danh sách `SOURCE_LANGUAGES`; chọn xong **giữ 250 ms** cho người dùng thấy dấu ✓ rồi mới quay lại |
+| `TargetLanguageScreen.tsx` | Chọn "Dịch sang" | Danh sách `TARGET_LANGUAGES`; chặn chọn trùng ngôn ngữ nguồn |
+| `VoiceListeningScreen.tsx` | Nghe trực tiếp / ghi rồi nhận dạng | Tự chọn chế độ theo `isLiveAudioSupported()`; có "phiên" chống trộn kết quả; `AppState` tắt micro khi rời app |
+| `CameraScreen.tsx` | Chụp / chọn ảnh để OCR | `expo-camera` + `expo-image-picker`; khung `CornerFrame`; chọn xong gọi `processImage` |
+
+Ba màn dùng chung component **`ScreenHeader`** (nút back + tiêu đề) để trông đồng nhất.
+
+**Hai "phiên bản con" quan trọng trong `VoiceListeningScreen`/`CameraScreen`:** cả hai
+đều truyền `inputLanguage` xuống store, và cả hai đều dùng chung cơ chế **kiểm tra còn
+là phiên mới nhất không** (giống `sessionId` ở §6.7) để kết quả cũ không nhảy vào UI mới.
+
+### 6.10 Component giao diện
+
+**Component V2 (đang dùng):**
 
 | File | Nhiệm vụ | Chi tiết đáng chú ý |
 | :--- | :--- | :--- |
-| `InputModeSelector.tsx` | 3 tab Text/Voice/Image | Đổi icon khi active (`'mic-outline'` → `'mic'`) |
-| `LanguagePicker.tsx` | Modal chọn ngôn ngữ | Dùng `FlatList`, nút X để đóng |
-| `VoiceRecorder.tsx` | Ghi âm | Xin quyền micro lúc mount; đếm thời gian bằng `setInterval` |
-| `ImagePickerButton.tsx` | Chọn/chụp ảnh | `Alert` hỏi Camera hay Thư viện |
-| `ContextInput.tsx` | Ô nhập ngữ cảnh | Thu/mở gọn; `LayoutAnimation` chạy mượt |
-| `TranslationResult.tsx` | Hiện bản dịch | Nút Copy + hiển thị cặp ngôn ngữ `VI → EN` |
-| `VoiceCloningPanel.tsx` | Panel nhái giọng | Ghi mẫu giọng, tạo speech, phát lại |
+| `LanguageTile.tsx` | Ô ngôn ngữ ở Home ("Dịch từ"/"Dịch sang") | Dùng chung cho cả 2 ô; 2 dòng chữ dọc + chevron-down |
+| `LanguageRow.tsx` | Hàng ngôn ngữ trong màn chọn | Đang chọn: nền `primarySoftStrong` + dấu ✓ |
+| `PrimaryButton.tsx` | Nút chính / nút "viên thuốc" | 2 variant `primary` / `pill`; có trạng thái `loading`, `disabled` |
+| `OutlineButton.tsx` | Nút viền | 3 tông `default`/`danger`/`dark`, 2 cỡ `md`/`lg` |
+| `IconCircleButton.tsx` | Nút tròn chỉ có icon | 4 variant `soft`/`neutral`/`cameraDark`/`cameraClose` |
+| `ToneChip.tsx` | Chip giọng văn | Đổi màu khi chọn; `accessibilityRole="checkbox"` |
+| `ErrorCard.tsx` | Thẻ báo lỗi | Có nút "Thử lại" (`OutlineButton`) |
+| `ScreenHeader.tsx` | Header màn phụ | Nút back + tiêu đề |
+| `Waveform.tsx` | Sóng âm khi đang nghe | 13 thanh `Animated` lệch pha |
+| `CornerFrame.tsx` | 4 góc khung ngắm ở camera | 4 góc vẽ bằng `View` + bo góc |
 
-**Điểm chung của mọi component — theme sáng/tối:**
-```tsx
-const isDark = useColorScheme() === 'dark';
-<View style={[styles.card, isDark && styles.cardDark]}>
+**Component V1 giữ lại để tham khảo (không còn được điều hướng tới):**
+`InputModeSelector`, `LanguagePicker`, `VoiceRecorder`, `ImagePickerButton`,
+`ContextInput`, `TranslationResult`, `VoiceCloningPanel`, `Card`, và màn
+`TranslationScreen` + `PlaceholderScreen`. Đầu mỗi file có dòng ghi chú
+*"Deprecated: thay bởi giao diện V2. Giữ để tham khảo."*
+
+### 6.11 Hệ thống theme (V2) — `mobile/src/theme/`
+
+Trước đây **mỗi component tự lo màu tối** (lặp code). V2 gom về một chỗ:
+
+```mermaid
+graph TD
+    SS["store/settingsStore.ts<br/>themeMode: light | dark | system"] --> TP
+    TP["theme/ThemeProvider.tsx<br/>useTheme() → { colors, mode, toggleMode }"] --> C["theme/colors.ts<br/>lightColors / darkColors"]
+    TP --> T["theme/ThemedText.tsx<br/>chữ tự đổi màu"]
+    TP --> S["Mọi screen & component<br/>const { colors } = useTheme()"]
 ```
-Mỗi component tự lo màu tối của mình. Không có ThemeProvider tập trung — đơn giản
-nhưng lặp code; đây là "nợ kỹ thuật" chấp nhận được ở quy mô đồ án.
 
-**`VoiceCloningPanel.tsx` — vô hiệu hoá đúng chỗ:**
-```tsx
-const isTtsUnavailable = targetLanguage === 'vi';
-{isTtsUnavailable ? <View>...không hỗ trợ...</View> : <>...</>}
-```
-- Vì TTS không nhái được giọng tiếng Việt, panel **ẩn toàn bộ nút** thay vì để người
-  dùng bấm rồi nhận lỗi.
+- `ThemeProvider.tsx`: đọc `themeMode` từ `settingsStore`; nếu là `'system'` thì hỏi
+  `useColorScheme()` của hệ điều hành, ngược lại dùng thẳng `'light'`/`'dark'`.
+  Bơm màu qua `useTheme()`.
+- `colors.ts`: hai bảng màu `lightColors` / `darkColors` cùng một kiểu `ThemeColors`.
+  Thêm `cameraColors` — **cố định không đổi theo theme** vì màn camera luôn nền tối.
+- `typography.ts`: cỡ chữ + font, tất cả đi qua `ms()` (§6.12).
+- `ThemedText.tsx`: component `<Text>` tự lấy màu + cỡ theo theme, giới hạn
+  `maxFontSizeMultiplier={1.2}` để chữ không phình quá to khi người dùng tăng cỡ chữ máy.
+- **Nếu bỏ ThemeProvider:** phải quay lại cách cũ — mỗi component tự `useColorScheme()`
+  và tự định nghĩa màu; sửa 1 màu phải sửa hàng chục file.
 
-### 6.10 `mobile/src/constants/languages.ts` — Nguồn chân lý về ngôn ngữ (35 dòng)
+> **Lưu ý còn tồn:** `app.json` vẫn để `"userInterfaceStyle": "light"`. Muốn app **theo
+> đúng theme hệ thống** (khi chọn chế độ "system") cần đổi thành `"automatic"` và thêm
+> plugin `expo-system-ui`. Đây là việc **chưa làm**, ghi lại để biết.
+
+### 6.12 `mobile/src/constants/` — Ngôn ngữ & câu chữ
+
+**`languages.ts`** — nguồn chân lý duy nhất về ngôn ngữ:
 
 ```ts
-export const LANGUAGES = [ {code:'vi',...}, {code:'en',...}, ... ];
-export const STT_LANGUAGES = LANGUAGES.filter(l => l.code === 'vi');     // chỉ tiếng Việt
-export function supportsSpeechToText(code: string): boolean { ... }
+export const LANGUAGE_CATALOG = [ /* 11 ngôn ngữ, mỗi mục có: */
+  { code: 'vi', shortLabel: 'Tiếng Việt', fullLabel: 'Tiếng Việt (Vietnamese)',
+    supportsVoiceInput: true, supportsOcr: true, supportsTts: true, ... },
+  /* en, zh, ja, ko, fr, de, es, pt, ru, it */
+];
+export const SOURCE_LANGUAGES = LANGUAGE_CATALOG;         // 11 lựa chọn cho "Dịch từ"
+export const TARGET_LANGUAGES = LANGUAGE_CATALOG;         // 11 lựa chọn cho "Dịch sang"
+export const DEFAULT_SOURCE_CODE = 'vi';                  // mặc định khi mở app
+export const DEFAULT_TARGET_CODE = 'en';
+export function supportsSpeechToText(code): boolean { ... }  // chỉ 'vi' → true
+export function supportsOcr(code): boolean { ... }           // vi/en/ja/zh
+export function supportsTts(code): boolean { ... }           // cả 11
 ```
-- **`STT_LANGUAGES` chỉ có 1 phần tử** — hệ thống **cố ý** chỉ nhận giọng nói tiếng Việt
-  (PhoASR là model tiếng Việt). Hàm `supportsSpeechToText()` là **công tắc dùng chung**:
-  UI ẩn nút micro, Store chặn streaming, tất cả dựa vào cùng 1 hàm.
-- Cần thêm ngôn ngữ mới cho STT? Đổi **một dòng** ở đây là toàn app cập nhật theo
-  (miễn backend có model tương ứng).
+
+- **11 ngôn ngữ = 11 ngôn ngữ backend hỗ trợ** (`vi, en, zh, ja, ko, fr, de, es, pt, ru, it`).
+  Nguồn xác nhận: `docs/language-support.md`.
+- Ba hàm `supportsXxx()` là **công tắc dùng chung**: UI ẩn nút, Store chặn hành động —
+  tất cả đọc từ **cùng một chỗ**. Thêm khả năng cho 1 ngôn ngữ = sửa **một dòng** ở đây.
+- `DEFAULT_SOURCE_CODE` / `DEFAULT_TARGET_CODE` thay cho các chuỗi `'vi'`/`'en'` rải rác
+  trước đây (ở `api.ts`, `stream.ts`, `translationStore.ts`, `VoiceListeningScreen.tsx`).
+- Kiểu `LanguageCode`, `TargetLanguageCode` sinh ra từ catalog; alias cũ
+  `OldLanguageCode` / `TargetLanguageCode` được đánh dấu `@deprecated` nhưng giữ để
+  **không phá vỡ import cũ**.
+
+**`strings.ts`** — **toàn bộ câu chữ tiếng Việt** gom một chỗ:
+```ts
+export const strings = {
+  home: { sourceLabel: 'Dịch từ', targetLabel: 'Dịch sang', translateButton: 'Dịch', ... },
+  voice: { micHint: (names) => `Micro chỉ hỗ trợ ${names}`, ... },  // hàm nhận tham số
+  ...
+};
+```
+- Một số chuỗi là **hàm** (ví dụ gợi ý tên ngôn ngữ hỗ trợ) để ghép tên động từ catalog
+  thay vì viết cứng — thêm ngôn ngữ mới thì câu chữ tự cập nhật.
+- **Nếu bỏ:** chữ tiếng Việt rải khắp component, đổi 1 câu phải mò nhiều file.
+
+### 6.13 `mobile/src/store/settingsStore.ts` — Cài đặt lưu bền (93 dòng)
+
+Store nhỏ, nhưng là chỗ **duy nhất ghi nhớ cài đặt qua các lần mở app**.
+
+```ts
+interface SettingsState {
+  defaultSourceLang: LanguageCode;   // "Dịch từ" mặc định, nhớ mãi
+  themeMode: 'light' | 'dark' | 'system';
+  hasHydrated: boolean;              // đã đọc xong từ bộ nhớ chưa
+  setDefaultSourceLang, setThemeMode,
+}
+const PERSIST_VERSION = 1;           // tăng khi đổi cấu trúc dữ liệu lưu
+```
+
+- Dùng middleware `persist` của Zustand + `createJSONStorage(AsyncStorage)` để **tự động
+  ghi xuống bộ nhớ điện thoại** mỗi lần giá trị đổi.
+- Chỉ 2 trường `defaultSourceLang` + `themeMode` được ghi (kiểu `PersistedSettings`).
+  `hasHydrated` **không** ghi — nó là cờ tạm thời.
+- `onRehydrateStorage` bật `hasHydrated = true` sau khi đọc xong → UI biết lúc nào đã
+  sẵn sàng, tránh nháy sai ngôn ngữ lúc mở app.
+- `migrate` + `PERSIST_VERSION`: nếu sau này đổi cấu trúc (ví dụ thêm trường), tăng số
+  version lên để chuyển đổi dữ liệu cũ thay vì làm hỏng nó.
+- **Nếu bỏ file này:** mỗi lần mở app lại quay về mặc định cứng và không nhớ theme.
+
+### 6.14 `mobile/src/hooks/` — Hai hook giao diện
+
+**`useSpeech.ts` (163 dòng)** — gói toàn bộ logic đọc to (TTS) cho thẻ kết quả:
+```ts
+export function useSpeech(text, language, enabled) {
+  // trả về: { status, ttsError, play, stop }
+  //   status: 'idle' | 'loading' | 'playing' | 'error'
+}
+```
+- `play()` gọi `apiSynthesizeSpeech(...)` → nhận base64 → `saveBase64Audio()` ghi file →
+  phát bằng `expo-av`.
+- **Chốt TTS bằng `supportsTts(language)`**: nếu ngôn ngữ đích không hỗ trợ, hook không
+  làm gì, tránh gọi API chắc chắn lỗi.
+- `enabled` (thường = `phase === 'result'`) để hook **không chạy khi chưa có kết quả**.
+- **Nếu bỏ:** mỗi màn hình hiển thị kết quả phải tự viết lại logic phát/dừng audio.
+
+**`useVoiceRecording.ts` (80 dòng)** — chế độ "ghi rồi nhận dạng":
+```ts
+export function useVoiceRecording() { /* { start, stop, cancel } */ }
+```
+- `start()` xin quyền micro rồi bắt đầu ghi bằng `expo-av`.
+- `stop()` dừng và trả về đường dẫn file (hoặc `null`).
+- `cancel()` dừng và **bỏ kết quả** — dùng khi người dùng rời màn giữa chừng.
+- Đây là chế độ dùng được trong **Expo Go** (không cần module native như live audio).
+
+### 6.15 `mobile/src/utils/` — Hai tiện ích nền
+
+**`scale.ts` (72 dòng)** — quy ước co giãn kích thước, **bắt buộc** cho mọi StyleSheet:
+```ts
+const BASE_WIDTH = 411;   // dp màn chuẩn (Pixel 6)
+const BASE_HEIGHT = 890;
+s(size)   // co theo chiều NGANG — dùng cho: chiều rộng, padding ngang, borderRadius
+vs(size)  // co theo chiều DỌC   — dùng cho: chiều cao khối lớn, khoảng cách dọc
+ms(size)  // co VỪA MỪA          — dùng cho: cỡ chữ, lineHeight, icon
+```
+- Hệ số co giãn bị **kẹp trong [0.8, 1.3]** để giao diện không quá nhỏ trên máy bé hay
+  quá to trên tablet; kết quả làm tròn bằng `PixelRatio.roundToNearestPixel`.
+- **Quy tắc bắt buộc (theo `CODING_STANDARDS.md`):** không viết số cứng cho kích thước
+  trong StyleSheet (trừ độ dày viền `1`/`StyleSheet.hairlineWidth` và `0`).
+- Kiểm tra tay trên nhiều máy: xem `mobile/MANUAL_QA.md`.
+
+**`buildContext.ts` (60 dòng)** — ghép giọng văn + ghi chú thành `context` cho backend:
+```ts
+buildContext(['formal'], '')          // → { context: 'Giọng văn: Trang trọng', contextPreset: 'Formal' }
+buildContext(['formal','business'], 'gửi cho khách hàng')
+// → { context: 'Giọng văn: Trang trọng, Kinh doanh. Ghi chú: gửi cho khách hàng' }
+```
+- `PRESET_MAP` chỉ ánh xạ `contextPreset` khi người dùng chọn **đúng 1 tone** — backend
+  chỉ hiểu preset cho trường hợp đơn.
+- Chọn nhiều tone hoặc có ghi chú → gộp thành chuỗi `context` tự do.
+- **Nếu bỏ:** logic ghép ngữ cảnh nằm rải trong store, khó kiểm thử.
 
 ---
 
@@ -1431,8 +1770,12 @@ Cột cuối ghi mức độ ưu tiên gỡ khi refactor.
 | `pending_byte` (byte lẻ) | `stream.py` | Crash ngẫu nhiên khi WiFi chèn gói lẻ byte | 🟠 Giữ |
 | `VADSettings` (hằng tập trung) | `stream.py` | Con số rải rác, sửa 1 quên 5 (vi phạm standard) | 🟡 Nên giữ |
 | `sessionId` chống trộn phiên | `translationStore.ts` | Chữ phiên cũ nhảy vào phiên mới | 🟠 Giữ |
+| `swapLanguages` + chặn nguồn=đích | `translationStore.ts` | Chọn trùng ngôn ngữ → dịch vô nghĩa, phá STT/TTS | 🟠 Giữ |
+| `supportsSpeechToText/Ocr/Tts` | `constants/languages.ts` | UI hiện nút chắc chắn lỗi; người dùng nhận thông báo khó hiểu | 🟠 Giữ |
+| `ThemeProvider` + `useTheme()` | `theme/ThemeProvider.tsx` | Mỗi component tự `useColorScheme()` → lặp code, khó đổi màu | 🟠 Giữ |
+| `hasHydrated` + `migrate` | `settingsStore.ts` | Đọc bộ nhớ chưa xong đã vẽ UI → nháy sai ngôn ngữ lúc mở | 🟡 Nên giữ |
 | `captureGeneration` | `liveAudio.ts` | Micro có thể bật lén sau khi người dùng huỷ | 🟠 Giữ |
-| `AppState` cleanup | `TranslationScreen.tsx` | Rời app vẫn thu micro → tốn pin, rò rỉ riêng tư | 🟠 Giữ |
+| `AppState` cleanup | `HomeScreen.tsx` / `VoiceListeningScreen.tsx` | Rời app vẫn thu micro → tốn pin, rò rỉ riêng tư | 🟠 Giữ |
 | `api_key_middleware` | `main.py` | Ai biết URL cũng dùng được GPU của bạn | 🔴 Bật khi production |
 | `update_mobile_config()` | `start_tunnel_and_server.py` | Mỗi lần đổi tunnel phải sửa tay `api.ts` | 🟡 Tiện ích |
 | `drain_thread` | `start_tunnel_and_server.py` | Trên Windows: tiến trình con treo vì pipe đầy 4 KB | 🟠 Giữ (nếu dùng Windows) |
@@ -1450,8 +1793,8 @@ Cột cuối ghi mức độ ưu tiên gỡ khi refactor.
 | :--- | :--- | :--- |
 | Hardcode path `d:/APP test/...` | `translation_adapter.py:_resolve_model_path` | Xoá, chỉ dùng `settings.GEMMA_GGUF_PATH` |
 | `allow_origins=["*"]` | `main.py` CORS | Siết thành danh sách URL cụ thể khi production |
-| Lặp theme sáng/tối ở mọi component | `mobile/src/components/*` | Tách ThemeProvider/context |
-| `TranslationResult` import `Clipboard` từ `react-native` | `TranslationResult.tsx` | Đã tách sang `@react-native-clipboard` ở RN mới |
+| `"userInterfaceStyle": "light"` | `mobile/app.json` | Đổi `"automatic"` + thêm `expo-system-ui` để theo theme hệ thống |
+| Tên file/màn còn chữ "V1" | `screens/*` (legacy) | Dọn hẳn các file V1 không dùng khi không cần tham khảo nữa |
 | Phiên bản trong `requirements.txt` rất cao | `requirements.txt` | Kiểm tra lại tính khả dụng khi cài thật |
 
 ---
@@ -1514,7 +1857,7 @@ cd mobile && npm run typecheck
 | :--- | :--- |
 | **Người mới hoàn toàn** | §1 → §2 → §4.1 → file `routes/translate.py` → `models/translation_adapter.py` |
 | **Muốn hiểu real-time** | §4.4 → `routes/stream.py` (đọc từ dưới lên: endpoint → worker → helpers) → `services/stream.ts` |
-| **Muốn sửa giao diện** | §6.7 → `translationStore.ts` → `TranslationScreen.tsx` → component cần sửa |
+| **Muốn sửa giao diện** | §6.7 → `translationStore.ts` → `HomeScreen.tsx` → `theme/` → component cần sửa |
 | **Muốn tối ưu model** | §5.1 → `config.py` → `models/manager.py` → adapter tương ứng |
 | **Muốn triển khai** | §7.1 (launcher) → §8 (bảo mật API key, CORS) |
 
@@ -1548,10 +1891,11 @@ A: Là cách chạy code đồng bộ (blocking) trong thread riêng, không ch�
 async. Suy luận model là blocking → bắt buộc dùng, nếu không server "đóng băng".
 
 **Q: Thêm 1 ngôn ngữ dịch mới (ví dụ Thái) thì làm gì?**
-A: 1) Thêm vào `LANGUAGES` ở `mobile/src/constants/languages.ts`; 2) Thêm vào
+A: 1) Thêm một mục vào `LANGUAGE_CATALOG` ở `mobile/src/constants/languages.ts`
+(đặt cờ `supportsVoiceInput`/`supportsOcr`/`supportsTts` cho phù hợp); 2) Thêm tên vào
 `LANGUAGE_NAMES` ở `translation_adapter.py`; 3) Nếu muốn đọc to, thêm giọng vào
 `EDGE_VOICES_FEMALE/MALE` ở `tts_adapter.py`. Model dịch (TranslateGemma) đã hỗ trợ
-nhiều ngôn ngữ sẵn — chỉ cần khai báo.
+nhiều ngôn ngữ sẵn — chỉ cần khai báo. Nguồn xác nhận khả năng: `docs/language-support.md`.
 
 **Q: Vì sao có `metrics.py` mà không thấy app dùng?**
 A: Đây là endpoint **quan sát/demo**, dùng qua `/docs` hoặc `smoke_test.py --base ...`
@@ -1618,9 +1962,12 @@ Bảng "ai import ai" rút gọn:
 | `core/config.py` | torch (chỉ để kiểm tra CUDA) |
 | `core/vram_monitor.py` | torch |
 | `schemas/*.py` | pydantic |
-| Mobile `store` | `services/api`, `services/stream`, `services/liveAudio`, `constants/languages` |
+| Mobile `store` | `services/api`, `services/stream`, `services/liveAudio`, `constants/languages`, `constants/strings`, `utils/buildContext` |
+| Mobile `settingsStore` | `store/settingsStore` |
+| Mobile `theme/ThemeProvider` | `theme/colors`, `store/settingsStore` |
+| Mobile `screens/*` | `store/translationStore`, `theme/ThemeProvider`, `components/*`, `constants/strings` |
 | Mobile `services/stream` | `services/api` (lấy URL) |
-| Mobile `services/api` | `config/api` |
+| Mobile `services/api` | `config/api`, `constants/languages` |
 
 **Nguyên tắc:** mũi tên chỉ đi **một chiều** từ ngoài vào trong
 (main → routes → manager → adapters → core). Không có chiều ngược.
@@ -1639,7 +1986,7 @@ Bảng "ai import ai" rút gọn:
 6. `backend/app/main.py` — ghép mọi thứ lại
 7. `backend/app/api/routes/stream.py` — phần khó nhất (đọc khi đã quen)
 8. `mobile/src/store/translationStore.ts` — não bộ mobile
-9. `mobile/src/screens/TranslationScreen.tsx` — giao diện
+9. `mobile/src/screens/HomeScreen.tsx` — giao diện V2 (đọc các màn phụ ở §6.9 sau)
 10. `backend/tests/` — xem hệ thống được kiểm tra thế nào
 
 ---
