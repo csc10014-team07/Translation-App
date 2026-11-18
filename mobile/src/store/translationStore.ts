@@ -247,6 +247,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       translatedText,
       targetLanguage,
       referenceAudioUri,
+      synthesizedAudioUri: previousAudioUri,
     } = get();
     if (!translatedText.trim()) {
       set({ error: 'Please translate some text first.' });
@@ -259,7 +260,11 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
         targetLanguage,
         referenceAudioUri ?? undefined,
       );
-      const localUri = await saveBase64Audio(result.audio_base64, result.format);
+      const localUri = await saveBase64Audio(
+        result.audio_base64,
+        result.format,
+        previousAudioUri,
+      );
       set({ synthesizedAudioUri: localUri });
     } catch (e: unknown) {
       set({ error: extractErrorMessage(e, 'Speech synthesis failed.') });

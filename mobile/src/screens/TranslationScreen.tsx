@@ -36,6 +36,7 @@ export default function TranslationScreen() {
     context,
     targetLanguage,
     translatedText,
+    translatedLanguage,
     sourceLanguage,
     synthesizedAudioUri,
     isTranscribing,
@@ -282,14 +283,14 @@ export default function TranslationScreen() {
         <TranslationResult
           translatedText={translatedText}
           sourceLanguage={sourceLanguage}
-          targetLanguage={targetLanguage}
+          targetLanguage={translatedLanguage || targetLanguage}
         />
       ) : null}
 
       {/* ── Voice Cloning Panel ── */}
       <VoiceCloningPanel
         translatedText={translatedText}
-        targetLanguage={targetLanguage}
+        translatedLanguage={translatedLanguage}
         isSynthesizing={isSynthesizing}
         synthesizedAudioUri={synthesizedAudioUri}
         onRecordReference={setReferenceAudio}
