@@ -86,6 +86,16 @@ export const strings = {
   },
 
   voice: {
+    // ── idle ──
+    /** Tiêu đề khi chưa bắt đầu nói. */
+    idleTitle: 'Chạm để nói',
+    /** Gợi ý một dòng dưới tiêu đề khi idle. */
+    idleHint: 'Chạm vào micro rồi nói tiếng Việt. Chữ hiện ra khi bạn nói.',
+    /** Placeholder giữa card khi idle (chưa có chữ nào). */
+    idleCardHint: 'Chữ bạn nói sẽ hiện ở đây.',
+    /** Chú thích dưới nút micro khi idle. */
+    tapToStart: 'Chạm để bắt đầu nói',
+    // ── listening ──
     listening: 'Đang nghe…',
     /** Gợi ý khi nghe trực tiếp; tên ngôn ngữ lấy từ nguồn hiện tại. */
     hint: (sourceLabel: string): string =>
@@ -93,10 +103,27 @@ export const strings = {
     /** Gợi ý khi ghi âm rồi nhận dạng; tên ngôn ngữ lấy từ nguồn hiện tại. */
     hintNoLive: (sourceLabel: string): string =>
       `Hãy nói ${lowerMidSentence(sourceLabel)}. Chữ sẽ hiện sau khi bạn dừng.`,
-    recognizing: 'Đang nhận dạng…',
+    /** Placeholder giữa card khi đang nghe nhưng chưa có chữ nào. */
+    listeningPlaceholder: 'Đang nghe bạn nói…',
     tapToStop: 'Chạm để dừng và dịch',
+    // ── recognizing ──
+    recognizing: 'Đang nhận dạng…',
+    /** Gợi ý dưới tiêu đề khi đang nhận dạng. */
+    recognizingHint: 'Đợi một chút, đang xử lý lời nói của bạn.',
+    /** Chú thích dưới nút khi đang nhận dạng. */
+    recognizingCaption: 'Đang nhận dạng…',
+    // ── recognizing / finalize ──
+    /** Gợi ý thay thế khi tự động dừng do vượt thời gian tối đa. */
+    limitReached: 'Đã đạt thời gian tối đa, đang dịch…',
+    /** Thông báo accessibility khi còn VOICE_WARNING_REMAINING_S giây. */
+    warningAnnounce: 'Còn 5 giây',
+    // ── lỗi ──
     noSpeech: 'Chưa nghe thấy giọng nói. Hãy thử lại.',
     permissionDenied: 'Cần quyền micro để nhận dạng giọng nói.',
+    /** Lỗi khi file ghi âm vượt quá thời lượng backend cho phép (HTTP 422). */
+    tooLong: 'Bạn nói quá dài, hãy nói ngắn hơn.',
+    /** Lỗi mất kết nối WebSocket trong chế độ nghe trực tiếp. */
+    networkError: 'Mất kết nối. Hãy thử lại.',
     /**
      * Thông báo khi nguồn hiện tại không nhập được bằng giọng nói. Danh sách
      * ngôn ngữ ASR lấy trực tiếp từ catalog (`supportsVoiceInput`).

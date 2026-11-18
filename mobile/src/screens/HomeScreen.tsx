@@ -33,6 +33,7 @@ import {
   supportsTts,
   supportsVoiceInput,
 } from '../constants/languages';
+import { INPUT_MAX_LENGTH } from '../constants/limits';
 import {
   useTranslationStore,
   applyDefaultsFromSettings,
@@ -320,7 +321,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 onChangeText={setText}
                 placeholder={strings.home.placeholder}
                 placeholderTextColor={colors.placeholder}
-                maxLength={500}
+                maxLength={INPUT_MAX_LENGTH}
                 textAlignVertical="top"
                 maxFontSizeMultiplier={1.2}
                 style={[
