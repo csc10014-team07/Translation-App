@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # ── Model identifiers / paths ──────────────────────────────────────────
     MODELS_DIR: str = "./models"
     PHOASR_MODEL_ID: str = "Qualcomm-AI-Research/PhoASR-whisper-small"
+    PHOASR_LOCAL_DIR: str = "./models/phoasr"
     GEMMA_GGUF_PATH: str = "./models/gemma/translategemma-4b-it.Q5_K_M.gguf"
 
     # ── Compute device ─────────────────────────────────────────────────────

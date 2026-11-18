@@ -12,6 +12,8 @@ import shutil
 import sys
 from pathlib import Path
 
+PHOASR_MODEL_ID = "Qualcomm-AI-Research/PhoASR-whisper-small"
+
 try:
     from huggingface_hub import hf_hub_download, snapshot_download
 except ImportError:
@@ -33,6 +35,26 @@ POCKET_TTS_SUPPORTED_LANGUAGES = [
 
 
 
+def download_phoasr(target_dir: Path) -> None:
+    """Download the PhoASR Whisper model snapshot into ``target_dir``."""
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"\n[1/3] Downloading PhoASR ({PHOASR_MODEL_ID}) to {target_dir}...")
+    try:
+        snapshot_download(
+            repo_id=PHOASR_MODEL_ID,
+            local_dir=str(target_dir),
+        )
+        print(f"PhoASR ready at: {target_dir}")
+    except Exception as exc:
+        print(
+            f"Failed to auto-download PhoASR: {exc}\n"
+            "If gated or restricted, download the model manually from:\n"
+            f"  https://huggingface.co/{PHOASR_MODEL_ID}\n"
+            f"and place its files at: {target_dir}"
+        )
+
+
 def download_gemma_gguf(target_file: Path) -> None:
     """Download TranslateGemma 4B GGUF (Q5_K_M quantization)."""
     repo_id = "mradermacher/translategemma-4b-it-GGUF"
@@ -40,7 +62,7 @@ def download_gemma_gguf(target_file: Path) -> None:
     target_dir = target_file.parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n[1/2] Downloading TranslateGemma 4B GGUF ({filename}) from {repo_id}...")
+    print(f"\n[2/3] Downloading TranslateGemma 4B GGUF ({filename}) from {repo_id}...")
     if target_file.exists() and target_file.stat().st_size > 1024 * 1024 * 100:
         print(f"File already exists: {target_file} ({target_file.stat().st_size / (1024*1024):.1f} MB)")
         return
@@ -50,8 +72,6 @@ def download_gemma_gguf(target_file: Path) -> None:
             repo_id=repo_id,
             filename=filename,
             local_dir=str(target_dir),
-            local_dir_use_symlinks=False,
-            resume_download=True,
         )
         downloaded_p = Path(downloaded_path)
         if downloaded_p.resolve() != target_file.resolve():
@@ -134,6 +154,10 @@ def main() -> None:
     print(f"Models storage directory: {base_dir}")
 
     gemma_file = base_dir / "gemma" / "translategemma-4b-it.Q5_K_M.gguf"
+    phoasr_dir = base_dir / "phoasr"
+
+    if not args.skip_phoasr:
+        download_phoasr(phoasr_dir)
 
     if not args.skip_gemma:
         download_gemma_gguf(gemma_file)

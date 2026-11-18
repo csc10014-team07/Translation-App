@@ -94,10 +94,14 @@ bash setup-wizard.sh
    pip install -r requirements.txt
    ```
 
-3. **Download models**:
-   - PhoASR: `Qualcomm-AI-Research/PhoASR-whisper-small` (auto-downloaded by transformers)
-   - TranslateGemma: Download `translategemma-4b-it.Q5_K_M.gguf` and place at `./models/gemma/`
-   - Set `GEMMA_GGUF_PATH` in `.env` to point to your model file.
+3. **Download models** (from the repository root):
+   ```bash
+   python backend/scripts/download_models.py --models-dir ./models
+   ```
+   - PhoASR: `Qualcomm-AI-Research/PhoASR-whisper-small` -> `./models/phoasr`
+   - TranslateGemma: `translategemma-4b-it.Q5_K_M.gguf` -> `./models/gemma/`
+   - Pocket TTS: optional, use `--tts-languages english` (or `all`)
+   - Set `GEMMA_GGUF_PATH` and `PHOASR_LOCAL_DIR` in `.env` if using non-default paths.
 
 4. **Configure environment variables** (see `.env.example`):
    ```bash
