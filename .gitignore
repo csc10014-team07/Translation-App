@@ -246,6 +246,7 @@ graphify-out/
 *.m4a
 uploads/
 tmp/
+backend/benchmarks/cache/
 
 # OS / editor
 .DS_Store
