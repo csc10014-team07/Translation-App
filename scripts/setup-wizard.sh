@@ -278,6 +278,7 @@ MAX_AUDIO_DURATION_S="${MAX_AUDIO_DURATION_S:-60.0}"
 write_env MAX_AUDIO_DURATION_S "$MAX_AUDIO_DURATION_S"
 
 write_env PHOASR_MODEL_ID "Qualcomm-AI-Research/PhoASR-whisper-small"
+write_env PHOASR_LOCAL_DIR "./models/phoasr"
 
 # ── Stage 4: Remote Cloudflare Tunnel ──────────────────────────────────────
 stage "Cloudflare Quick Tunnel (Remote 4G/Wi-Fi)"

@@ -1,0 +1,152 @@
+[
+  {
+    "id": "ctx_formal_001",
+    "preset": "Formal",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Could you please review the attached contract before our meeting tomorrow?",
+    "reference": "Kính đề nghị quý khách vui lòng xem qua hợp đồng đính kèm trước cuộc họp của chúng ta vào ngày mai.",
+    "required_keywords": ["quý khách", "hợp đồng", "vui lòng", "kính", "quý đối tác", "anh/chị"],
+    "forbidden_keywords": ["mày", "tao"]
+  },
+  {
+    "id": "ctx_formal_002",
+    "preset": "Formal",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "We deeply appreciate your partnership and look forward to working with you.",
+    "reference": "Chúng tôi trân trọng sự hợp tác của quý đối tác và rất mong muốn được tiếp tục đồng hành cùng quý vị.",
+    "required_keywords": ["chúng tôi", "quý đối tác", "quý vị", "trân trọng", "hợp tác"],
+    "forbidden_keywords": ["tao", "tụi tao", "mày"]
+  },
+  {
+    "id": "ctx_formal_003",
+    "preset": "Formal",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "If you have any further questions, please do not hesitate to contact our team.",
+    "reference": "Nếu quý khách có thêm bất kỳ câu hỏi nào, xin vui lòng liên hệ với đội ngũ của chúng tôi.",
+    "required_keywords": ["quý khách", "vui lòng", "liên hệ"],
+    "forbidden_keywords": ["hỏi gì thì ới", "mày"]
+  },
+  {
+    "id": "ctx_friendly_001",
+    "preset": "Friendly",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Hey! Are you free this weekend? Let's grab some coffee together.",
+    "reference": "Này, cuối tuần này cậu có rảnh không? Tụi mình cùng đi cà phê nhé.",
+    "required_keywords": ["cậu", "bạn", "mình", "tụi mình", "cà phê", "nhé"],
+    "forbidden_keywords": ["kính gửi", "kính mời quý khách"]
+  },
+  {
+    "id": "ctx_friendly_002",
+    "preset": "Friendly",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Thanks so much for helping me out yesterday, I really owe you one!",
+    "reference": "Cảm ơn bạn nhiều vì đã giúp mình hôm qua nhé, bữa nào mình mời lại!",
+    "required_keywords": ["bạn", "mình", "cảm ơn", "nhé", "cậu"],
+    "forbidden_keywords": ["kính chuyển", "kính thưa"]
+  },
+  {
+    "id": "ctx_friendly_003",
+    "preset": "Friendly",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Don't worry about it, everyone makes mistakes sometimes.",
+    "reference": "Đừng lo lắng quá nhé, ai rồi cũng có lúc mắc lỗi thôi mà.",
+    "required_keywords": ["đừng lo", "nhé", "thôi mà", "bạn"],
+    "forbidden_keywords": ["kính báo"]
+  },
+  {
+    "id": "ctx_it_001",
+    "preset": "IT",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Please deploy the latest commit to the staging server and verify the API endpoint.",
+    "reference": "Vui lòng deploy commit mới nhất lên staging server và kiểm tra lại API endpoint.",
+    "required_keywords": ["deploy", "commit", "staging", "server", "api", "endpoint"],
+    "forbidden_keywords": []
+  },
+  {
+    "id": "ctx_it_002",
+    "preset": "IT",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "We encountered an out of memory error during the database migration in Kubernetes.",
+    "reference": "Chúng tôi gặp lỗi out of memory trong quá trình migration cơ sở dữ liệu trên Kubernetes.",
+    "required_keywords": ["kubernetes", "migration", "database", "memory", "error"],
+    "forbidden_keywords": []
+  },
+  {
+    "id": "ctx_it_003",
+    "preset": "IT",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Make sure you push your branch and open a pull request before the CI pipeline runs.",
+    "reference": "Hãy chắc chắn bạn đã push branch và tạo pull request trước khi pipeline CI chạy.",
+    "required_keywords": ["push", "branch", "pull request", "ci", "pipeline"],
+    "forbidden_keywords": []
+  },
+  {
+    "id": "ctx_medical_001",
+    "preset": "Medical",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "The patient exhibits symptoms of acute respiratory infection and requires immediate diagnosis.",
+    "reference": "Bệnh nhân có các triệu chứng nhiễm trùng đường hô hấp cấp tính và cần được chẩn đoán ngay lập tức.",
+    "required_keywords": ["bệnh nhân", "triệu chứng", "hô hấp", "chẩn đoán"],
+    "forbidden_keywords": ["bạn này", "thằng bệnh"]
+  },
+  {
+    "id": "ctx_medical_002",
+    "preset": "Medical",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Take this antibiotic twice daily after meals and monitor your blood pressure.",
+    "reference": "Uống kháng sinh này hai lần mỗi ngày sau bữa ăn và theo dõi huyết áp của bạn.",
+    "required_keywords": ["kháng sinh", "huyết áp", "theo dõi", "bữa ăn"],
+    "forbidden_keywords": []
+  },
+  {
+    "id": "ctx_travel_001",
+    "preset": "Travel",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Excuse me, where is the baggage claim area for international arrivals?",
+    "reference": "Xin lỗi cho tôi hỏi, khu vực nhận hành lý cho các chuyến bay quốc tế ở đâu?",
+    "required_keywords": ["hành lý", "quốc tế", "xin lỗi", "ở đâu"],
+    "forbidden_keywords": []
+  },
+  {
+    "id": "ctx_travel_002",
+    "preset": "Travel",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "I would like to check in for my flight and request a window seat, please.",
+    "reference": "Tôi muốn làm thủ tục lên máy bay và xin chọn một chỗ ngồi cạnh cửa sổ.",
+    "required_keywords": ["thủ tục", "máy bay", "cửa sổ", "check in"],
+    "forbidden_keywords": []
+  },
+  {
+    "id": "ctx_general_001",
+    "preset": "General",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "The weather forecast predicts heavy rain across the city this afternoon.",
+    "reference": "Dự báo thời tiết cho thấy chiều nay sẽ có mưa to trên khắp thành phố.",
+    "required_keywords": ["thời tiết", "mưa", "chiều nay", "thành phố"],
+    "forbidden_keywords": []
+  },
+  {
+    "id": "ctx_general_002",
+    "preset": "General",
+    "source_lang": "en",
+    "target_lang": "vi",
+    "source": "Learning a new language opens up numerous opportunities in life.",
+    "reference": "Học một ngôn ngữ mới mở ra nhiều cơ hội trong cuộc sống.",
+    "required_keywords": ["ngôn ngữ", "cơ hội", "cuộc sống"],
+    "forbidden_keywords": []
+  }
+]

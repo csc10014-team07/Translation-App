@@ -88,9 +88,22 @@ class ASRAdapter:
 
     def __init__(self, device: str | None = None) -> None:
         self.device = device or settings.effective_device()
-        self.model_id = settings.PHOASR_MODEL_ID
+        self.model_id = self._resolve_model_source()
         self._pipe = None
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _resolve_model_source() -> str:
+        """Prefer a complete local snapshot, falling back to the Hugging Face ID."""
+        local_dir = Path(settings.PHOASR_LOCAL_DIR).expanduser()
+        has_config = (local_dir / "config.json").is_file()
+        has_weights = (local_dir / "model.safetensors").is_file() or (
+            local_dir / "pytorch_model.bin"
+        ).is_file()
+        if has_config and has_weights:
+            logger.info("Using local PhoASR snapshot: %s", local_dir)
+            return str(local_dir.resolve())
+        return settings.PHOASR_MODEL_ID
 
     def load(self) -> None:
         """Load PhoASR pipeline onto target device."""
