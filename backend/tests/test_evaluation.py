@@ -5,14 +5,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import unicodedata
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 from app.core.config import settings
 from app.models.asr_adapter import ASRAdapter
 from benchmarks import dataset_loader
 from benchmarks.dataset_loader import (
+    BUILTIN_FLORES_PAIRS,
     CONTEXT_PRESET_TARGETS,
+    DEFAULT_CACHE_DIR,
     MIN_EVAL_SAMPLES,
     _parse_fleurs_tsv,
     get_asr_samples,
@@ -87,6 +91,44 @@ def test_corpus_bleu_perfect() -> None:
 
 def test_corpus_bleu_length_mismatch() -> None:
     assert calculate_corpus_bleu(["một"], []) == 0.0
+
+
+def test_metrics_treat_nfc_and_nfd_as_identical() -> None:
+    nfc = "Tiếng Việt có dấu"
+    nfd = unicodedata.normalize("NFD", nfc)
+    assert nfc != nfd
+
+    assert calculate_wer(nfc, nfd) == 0.0
+    assert calculate_cer(nfc, nfd) == 0.0
+    assert calculate_sentence_bleu(nfc, nfd) == 100.0
+    assert calculate_sentence_chrf(nfc, nfd) == 100.0
+
+
+def test_context_keyword_matches_decomposed_unicode() -> None:
+    nfd_keyword = unicodedata.normalize("NFD", "quý khách")
+    res = evaluate_context_preset_sample(
+        preset="Formal",
+        hypothesis=f"Kính gửi {nfd_keyword}, cảm ơn.",
+        required_keywords=["quý khách"],
+        forbidden_keywords=[],
+    )
+    assert res["passed"] is True
+    assert res["found_required"] == ["quý khách"]
+
+
+def test_builtin_flores_pairs_are_verified_when_cache_exists() -> None:
+    cache_file = DEFAULT_CACHE_DIR / "flores200_en_vi.json"
+    if not cache_file.exists():
+        pytest.skip("FLORES cache not present; skipping offline provenance check")
+
+    cached = json.loads(cache_file.read_text(encoding="utf-8"))
+    cached_pairs = {(item["source"], item["reference"]) for item in cached}
+    missing = [
+        pair
+        for pair in BUILTIN_FLORES_PAIRS
+        if (pair["source"], pair["reference"]) not in cached_pairs
+    ]
+    assert not missing
 
 
 def test_context_preset_evaluation_pass() -> None:
@@ -172,6 +214,7 @@ def test_flores_dataset_reports_builtin_source(tmp_path) -> None:
     assert len(pairs) == 3
     assert meta["source"] == "builtin"
     assert meta["returned_pairs"] == 3
+    assert "10-pair fallback" in meta["dataset"]
 
 
 def test_asr_samples_are_marked_unverified(tmp_path) -> None:
@@ -317,3 +360,27 @@ def test_tts_round_trip_scoring() -> None:
     assert result["round_trip_scored_count"] == 1
     assert result["avg_wer_percent"] == 0.0
     assert result["avg_cer_percent"] == 0.0
+
+
+def test_report_records_translation_backend_device(tmp_path) -> None:
+    from scripts.evaluate import BenchmarkRunner
+
+    runner = BenchmarkRunner()
+    runner.results["hardware"]["translation"] = {
+        "device_requested": "cuda",
+        "device_actual": "cpu",
+        "gpu_offload": False,
+        "gpu_offload_supported": False,
+        "n_gpu_layers": 0,
+        "fallback_reason": "llama_cpp_cpu_only",
+    }
+    md_path = tmp_path / "report.md"
+    json_path = tmp_path / "results.json"
+
+    runner.export_reports(md_path, json_path)
+
+    report = md_path.read_text(encoding="utf-8")
+    assert "TranslateGemma backend" in report
+    assert "llama_cpp_cpu_only" in report
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    assert data["hardware"]["translation"]["device_actual"] == "cpu"

@@ -14,6 +14,7 @@ import json
 import logging
 import re
 import tarfile
+import unicodedata
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -178,48 +179,50 @@ VIETNAMESE_STOPWORDS = {
     "với",
 }
 
-# Built-in academic translation backup pairs (FLORES-200 devtest head)
-# Ensures evaluation runs out-of-the-box even in offline / sandboxed environments
+# First 10 pairs of FLORES-200 devtest (eng_Latn-vie_Latn), copied verbatim
+# from the official tarball at FLORES_TAR_URL. License: CC-BY-SA-4.0.
+# This is only an offline fallback: 10 pairs do not satisfy MIN_EVAL_SAMPLES,
+# so it must never be presented as a full FLORES-200 benchmark result.
 BUILTIN_FLORES_PAIRS = [
     {
-        "source": "On Monday, scientists from the Stanford University School of Medicine announced the invention of a new diagnostic tool that can sort cells by type: a tiny printable chip that can be produced using standard inkjet printers for possibly about one U.S. cent each.",
-        "reference": "Vào hôm thứ Hai, các nhà khoa học thuộc Trường Y thuộc Đại học Stanford đã công bố việc phát minh ra một công cụ chẩn đoán mới có thể phân loại các tế bào theo loại: một con chip in nhỏ có thể được sản xuất bằng máy in phun tiêu chuẩn với giá có thể là khoảng một xu Mỹ cho mỗi chiếc.",
+        "source": "\"We now have 4-month-old mice that are non-diabetic that used to be diabetic,\" he added.",
+        "reference": "“Chúng tôi hiện có đàn chuột 4 tháng tuổi đã hết bị tiểu đường,” ông nói thêm.",
     },
     {
-        "source": "Lead researchers say this may bring early detection of cancer, tuberculosis, HIV and malaria to patients in developing countries, where the survival rates from illnesses such as breast cancer can be half of those in richer countries.",
-        "reference": "Các nhà nghiên cứu chính cho biết điều này có thể mang lại việc phát hiện sớm ung thư, bệnh lao, HIV và bệnh sốt rét cho các bệnh nhân ở các nước đang phát triển, nơi tỷ lệ sống sót sau các bệnh như ung thư vú có thể chỉ bằng một nửa so với ở các nước giàu hơn.",
+        "source": "Dr. Ehud Ur, professor of medicine at Dalhousie University in Halifax, Nova Scotia and chair of the clinical and scientific division of the Canadian Diabetes Association cautioned that the research is still in its early days.",
+        "reference": "Tiến sĩ Ehud Ur, giáo sư y khoa của Trường Đại học Dalhousie ở Halifax, Nova Scotia và là chủ tịch ban lâm sàng và khoa học của Hiệp hội Bệnh Tiểu đường Canada cảnh báo rằng nghiên cứu này chỉ mới là sự khởi đầu.",
     },
     {
-        "source": "The JAS 39C Gripen crashed onto a runway at around 09:30 local time (02:30 UTC) and exploded, closing the airport to commercial flights.",
-        "reference": "Chiếc JAS 39C Gripen đã rơi xuống một đường băng vào khoảng 09:30 giờ địa phương (02:30 UTC) và phát nổ, khiến sân bay phải đóng cửa đối với các chuyến bay thương mại.",
+        "source": "Like some other experts, he is skeptical about whether diabetes can be cured, noting that these findings have no relevance to people who already have Type 1 diabetes.",
+        "reference": "Giống như một số chuyên gia khác, ông ấy hoài nghi về khả năng chữa bệnh tiểu đường, với lưu ý rằng các phát hiện này không liên quan tới người đã bị tiểu đường tuýp 1.",
     },
     {
-        "source": "The pilot was identified as Squadron Leader Dilokrit Pattavee.",
-        "reference": "Phi công được xác định danh tính là Thiếu tá Không quân Dilokrit Pattavee.",
+        "source": "On Monday, Sara Danius, permanent secretary of the Nobel Committee for Literature at the Swedish Academy, publicly announced during a radio program on Sveriges Radio in Sweden the committee, unable to reach Bob Dylan directly about winning the 2016 Nobel Prize in Literature, had abandoned its efforts to reach him.",
+        "reference": "Vào ngày thứ Hai, Sara Danius, thư ký thường trực của Ủy Ban Nobel Văn Học thuộc Viện Hàn Lâm Thụy Điển, trong một chương trình phát thanh của Đài Phát Thanh Sveriges ở Thụy Điển, đã công bố rằng, vì không thể liên lạc trực tiếp với Bob Dylan về việc trao Giải Nobel Văn Học năm 2016, ủy ban đã ngừng nỗ lực liên lạc với ông.",
     },
     {
-        "source": "Local media reported that an airport fire truck rolled over while responding to the crash.",
-        "reference": "Truyền thông địa phương đưa tin một chiếc xe cứu hỏa của sân bay đã bị lật khi ứng cứu vụ tai nạn.",
+        "source": "Danius said, \"Right now we are doing nothing. I have called and sent emails to his closest collaborator and received very friendly replies. For now, that is certainly enough.\"",
+        "reference": "Danius đã nói, “Ngay lúc này chúng ta chẳng làm gì cả. Tôi đã gọi và gửi email cho đối tác thân cận nhất của anh ta và nhận được phản hồi rất thân thiện. Hiện tại, như vậy là đủ.”",
     },
     {
-        "source": "No other casualties were reported at the scene.",
-        "reference": "Không có thương vong nào khác được báo cáo tại hiện trường.",
+        "source": "Previously, Ring's CEO, Jamie Siminoff, remarked the company started when his doorbell wasn't audible from his shop in his garage.",
+        "reference": "Trước đây, giám đốc điều hành của Ring, Jamie Siminoff, đã phát biểu rằng công ty ra đời khi ông không nghe tiếng chuông cửa khi đang khi ở trong gara.",
     },
     {
-        "source": "The airshow was taking place to mark Thailand's National Children's Day.",
-        "reference": "Chương trình biểu diễn hàng không đang diễn ra nhân Ngày Trẻ em Quốc gia Thái Lan.",
+        "source": "He built a WiFi door bell, he said.",
+        "reference": "Ông đã lắp môt chuông cửa WiFi, ông cho biết.",
     },
     {
-        "source": "Prime Minister Prayut Chan-o-cha offered condolences to the pilot's family.",
-        "reference": "Thủ tướng Prayut Chan-o-cha đã gửi lời chia buồn tới gia đình phi công.",
+        "source": "Siminoff said sales boosted after his 2013 appearance in a Shark Tank episode where the show panel declined funding the startup.",
+        "reference": "Siminoff cho biết doanh số tăng sau sự xuất hiện của mình vào năm 2013 trong một tập Shark Tank khi hội đồng giám khảo chương trình đã từ chối tài trợ cho công ty khởi nghiệp.",
     },
     {
-        "source": "A 28-year-old man in the city of Munich, Germany went to the police claiming that he had been forced into a threesome.",
-        "reference": "Một người đàn ông 28 tuổi ở thành phố Munich, Đức đã đến gặp cảnh sát và khai rằng anh ta bị ép quan hệ tình dục tập thể.",
+        "source": "In late 2017, Siminoff appeared on shopping television channel QVC.",
+        "reference": "Vào cuối năm 2017, Siminoff xuất hiện trên kênh truyền hình mua sắm QVC.",
     },
     {
-        "source": "He told officers that he met a 43-year-old woman at a bar, and she invited him back to her apartment.",
-        "reference": "Anh ta nói với cảnh sát rằng anh ta đã gặp một người phụ nữ 43 tuổi tại một quán bar và cô ấy đã mời anh ta về căn hộ của cô ấy.",
+        "source": "Ring also settled a lawsuit with competing security company, the ADT Corporation.",
+        "reference": "Ring cũng đã dàn xếp một vụ kiện với một công ty an ninh đối thủ là ADT Corporation.",
     },
 ]
 
@@ -252,8 +255,9 @@ def _download_bytes(url: str, timeout: int = 120) -> bytes:
 
 
 def _contains_keyword(text: str, keyword: str) -> bool:
-    pattern = r"(?<!\w)" + re.escape(keyword) + r"(?!\w)"
-    return re.search(pattern, text, flags=re.IGNORECASE) is not None
+    needle = unicodedata.normalize("NFC", keyword)
+    pattern = r"(?<!\w)" + re.escape(needle) + r"(?!\w)"
+    return re.search(pattern, unicodedata.normalize("NFC", text), flags=re.IGNORECASE) is not None
 
 
 def _extract_tar_member(tf: tarfile.TarFile, suffix: str) -> str:
@@ -353,11 +357,12 @@ def get_flores_dataset(
         except Exception as exc:
             logger.debug("Online FLORES download skipped/failed (%s), using built-in gold set", exc)
 
-    # 3. Fallback to built-in gold standard pairs
+    # 3. Fallback to the verified first 10 FLORES-200 devtest pairs
     pairs = BUILTIN_FLORES_PAIRS[:limit]
     metadata.update(
         {
             "source": "builtin",
+            "dataset": "FLORES-200 devtest eng_Latn-vie_Latn (10-pair fallback)",
             "returned_pairs": len(pairs),
             "available_pairs": len(BUILTIN_FLORES_PAIRS),
             "meets_requirement": len(pairs) >= MIN_EVAL_SAMPLES,
@@ -638,9 +643,10 @@ def get_tts_samples(
 
 
 def _context_keywords(reference: str) -> list[str]:
+    normalized = unicodedata.normalize("NFC", reference).lower()
     words = [
         word
-        for word in re.findall(r"\w+", reference.lower())
+        for word in re.findall(r"\w+", normalized)
         if len(word) >= 3 and not word.isdigit() and word not in VIETNAMESE_STOPWORDS
     ]
     unique = sorted(set(words), key=lambda word: (-len(word), word))

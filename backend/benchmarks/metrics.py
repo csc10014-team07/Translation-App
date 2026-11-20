@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from collections import Counter
 from collections.abc import Sequence
 from typing import Any
@@ -43,9 +44,14 @@ def _levenshtein_distance(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
     return prev_row[n2]
 
 
+def _nfc(text: str) -> str:
+    """Return NFC text so composed and decomposed Vietnamese compare equal."""
+    return unicodedata.normalize("NFC", text)
+
+
 def normalize_text_for_eval(text: str) -> str:
-    """Normalize text for fair metric evaluation (lowercase, strip extra spaces, punctuation)."""
-    text = text.lower().strip()
+    """Normalize text for fair metric evaluation (NFC, lowercase, strip punctuation/spaces)."""
+    text = _nfc(text).lower().strip()
     text = re.sub(r"[^\w\s\d]", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
@@ -53,11 +59,11 @@ def normalize_text_for_eval(text: str) -> str:
 
 def _contains_keyword(text: str, keyword: str) -> bool:
     """Match a keyword as a whole word/phrase using Unicode-aware boundaries."""
-    needle = keyword.strip()
+    needle = _nfc(keyword).strip()
     if not needle:
         return False
     pattern = r"(?<!\w)" + re.escape(needle) + r"(?!\w)"
-    return re.search(pattern, text, flags=re.IGNORECASE) is not None
+    return re.search(pattern, _nfc(text), flags=re.IGNORECASE) is not None
 
 
 def calculate_wer(reference: str, hypothesis: str, normalize: bool = True) -> float:
@@ -218,8 +224,8 @@ def calculate_sentence_chrf(
     Calculate sentence-level chrF++ score (character n-grams + word n-grams F-score).
     Standard metric for morphologically rich languages like Vietnamese.
     """
-    ref_str = re.sub(r"\s+", " ", reference.strip())
-    hyp_str = re.sub(r"\s+", " ", hypothesis.strip())
+    ref_str = re.sub(r"\s+", " ", _nfc(reference).strip())
+    hyp_str = re.sub(r"\s+", " ", _nfc(hypothesis).strip())
 
     if not hyp_str:
         return 0.0

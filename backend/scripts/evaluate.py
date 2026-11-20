@@ -102,6 +102,7 @@ class BenchmarkRunner:
             "summary": {},
             "datasets": {},
             "details": {},
+            "hardware": {},
         }
 
     def _vram_info(self) -> dict[str, Any]:
@@ -123,6 +124,16 @@ class BenchmarkRunner:
 
             adapter = TranslationAdapter()
             adapter.load()
+            backend_info = adapter.backend_info()
+            self.results["hardware"]["translation"] = backend_info
+            if (
+                backend_info.get("device_requested", "").startswith("cuda")
+                and backend_info.get("device_actual") == "cpu"
+            ):
+                logger.warning(
+                    "TranslateGemma is running on CPU (%s)",
+                    backend_info.get("fallback_reason"),
+                )
             if adapter._llm is None:
                 self._translation_skip_reason = "model_not_ready"
                 return None
@@ -704,6 +715,17 @@ class BenchmarkRunner:
             "| Module | Chỉ Số (Metric) | Kết Quả | Trạng Thái |",
             "| :--- | :--- | :--- | :--- |",
         ]
+        translation_hw = self.results.get("hardware", {}).get("translation")
+        if translation_hw:
+            lines.insert(
+                4,
+                f"- **TranslateGemma backend**: requested=`{translation_hw.get('device_requested')}`, "
+                f"actual=`{translation_hw.get('device_actual')}`, "
+                f"gpu_offload=`{translation_hw.get('gpu_offload')}`, "
+                f"supported=`{translation_hw.get('gpu_offload_supported')}`, "
+                f"n_gpu_layers=`{translation_hw.get('n_gpu_layers')}`, "
+                f"reason=`{translation_hw.get('fallback_reason') or 'none'}`",
+            )
 
         def _status(detail: dict[str, Any]) -> str:
             if detail.get("status") == "success":
@@ -797,6 +819,16 @@ class BenchmarkRunner:
             lines.append(
                 f"- Các bộ dữ liệu chưa đạt tối thiểu {MIN_EVAL_SAMPLES} mẫu: "
                 f"{', '.join(insufficient)}."
+            )
+        if (
+            translation_hw
+            and translation_hw.get("device_requested", "").startswith("cuda")
+            and translation_hw.get("device_actual") == "cpu"
+        ):
+            lines.append(
+                "- TranslateGemma đang chạy trên CPU dù đã yêu cầu CUDA "
+                f"(`{translation_hw.get('fallback_reason')}`). "
+                "Cần build `llama-cpp-python` với CUDA để tận dụng GPU."
             )
         if asr.get("status") == "success" and not asr.get("references_verified", False):
             lines.append(
