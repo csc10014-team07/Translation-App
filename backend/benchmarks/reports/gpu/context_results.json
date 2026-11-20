@@ -1,0 +1,1528 @@
+{
+  "timestamp": "2026-11-20T20:16:18.987902",
+  "summary": {
+    "context_presets": {
+      "status": "success",
+      "reason": null
+    }
+  },
+  "datasets": {
+    "context": {
+      "source": "cache",
+      "cache_file": "/mnt/d/Computational Thinking/Computational Thinking/Lab/Translation-App/backend/benchmarks/cache/context_online.json",
+      "requested_limit": 100,
+      "minimum_required": 100,
+      "dataset": "curated + Tatoeba/QED/FLORES-200",
+      "license": "mixed: curated, CC-BY-2.0, research-only, CC-BY-SA-4.0",
+      "licenses": [
+        "curated",
+        "CC-BY-2.0",
+        "research-only",
+        "CC-BY-SA-4.0"
+      ],
+      "returned_samples": 100,
+      "available_samples": 100,
+      "curated_samples": 15,
+      "online_samples": 85,
+      "preset_counts": {
+        "Formal": 20,
+        "Friendly": 20,
+        "IT": 20,
+        "Medical": 15,
+        "Travel": 15,
+        "General": 10
+      },
+      "meets_requirement": true
+    }
+  },
+  "details": {
+    "context_presets": {
+      "status": "success",
+      "total_tested": 100,
+      "passed_count": 95,
+      "overall_accuracy_percent": 95.0,
+      "per_preset_accuracy": {
+        "Formal": 100.0,
+        "Friendly": 90.0,
+        "IT": 95.0,
+        "Medical": 93.3,
+        "Travel": 93.3,
+        "General": 100.0
+      },
+      "per_preset_score": {
+        "Formal": 0.94,
+        "Friendly": 0.816,
+        "IT": 0.852,
+        "Medical": 0.861,
+        "Travel": 0.9,
+        "General": 0.833
+      },
+      "vram_before": {
+        "used_mb": 0.0,
+        "free_mb": 8123.8,
+        "total_mb": 8123.8,
+        "allocated_mb": 0.0
+      },
+      "vram_after": {
+        "used_mb": 2.0,
+        "free_mb": 8121.8,
+        "total_mb": 8123.8,
+        "allocated_mb": 0.0
+      },
+      "items": [
+        {
+          "id": "ctx_formal_001",
+          "preset": "Formal",
+          "source": "Could you please review the attached contract before our meeting tomorrow?",
+          "reference": "Kính đề nghị quý khách vui lòng xem qua hợp đồng đính kèm trước cuộc họp của chúng ta vào ngày mai.",
+          "hypothesis": "Kính gửi Quý đối tác,\n\nTôi kính đề nghị Quý vị vui lòng xem xét kỹ hợp đồng đính kèm trước buổi họp ngày mai.",
+          "passed": true,
+          "required_coverage": 0.667,
+          "found_required": [
+            "hợp đồng",
+            "vui lòng",
+            "kính",
+            "quý đối tác"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 1137.5
+        },
+        {
+          "id": "ctx_formal_002",
+          "preset": "Formal",
+          "source": "We deeply appreciate your partnership and look forward to working with you.",
+          "reference": "Chúng tôi trân trọng sự hợp tác của quý đối tác và rất mong muốn được tiếp tục đồng hành cùng quý vị.",
+          "hypothesis": "Chúng tôi vô cùng trân trọng sự hợp tác của quý vị và rất mong được tiếp tục cộng tác trong tương lai.",
+          "passed": true,
+          "required_coverage": 0.8,
+          "found_required": [
+            "chúng tôi",
+            "quý vị",
+            "trân trọng",
+            "hợp tác"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 418.6
+        },
+        {
+          "id": "ctx_formal_003",
+          "preset": "Formal",
+          "source": "If you have any further questions, please do not hesitate to contact our team.",
+          "reference": "Nếu quý khách có thêm bất kỳ câu hỏi nào, xin vui lòng liên hệ với đội ngũ của chúng tôi.",
+          "hypothesis": "Xin vui lòng cung cấp văn bản cần dịch.",
+          "passed": true,
+          "required_coverage": 0.333,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 192.8
+        },
+        {
+          "id": "ctx_friendly_001",
+          "preset": "Friendly",
+          "source": "Hey! Are you free this weekend? Let's grab some coffee together.",
+          "reference": "Này, cuối tuần này cậu có rảnh không? Tụi mình cùng đi cà phê nhé.",
+          "hypothesis": "Chào bạn! Bạn có rảnh cuối tuần không? Mình muốn đi uống cà phê với bạn nhé.",
+          "passed": true,
+          "required_coverage": 0.667,
+          "found_required": [
+            "bạn",
+            "mình",
+            "cà phê",
+            "nhé"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 362.3
+        },
+        {
+          "id": "ctx_friendly_002",
+          "preset": "Friendly",
+          "source": "Thanks so much for helping me out yesterday, I really owe you one!",
+          "reference": "Cảm ơn bạn nhiều vì đã giúp mình hôm qua nhé, bữa nào mình mời lại!",
+          "hypothesis": "Cảm ơn bạn rất nhiều vì đã giúp tôi hôm qua, tôi thực sự rất biết ơn!",
+          "passed": true,
+          "required_coverage": 0.4,
+          "found_required": [
+            "bạn",
+            "cảm ơn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 337.0
+        },
+        {
+          "id": "ctx_friendly_003",
+          "preset": "Friendly",
+          "source": "Don't worry about it, everyone makes mistakes sometimes.",
+          "reference": "Đừng lo lắng quá nhé, ai rồi cũng có lúc mắc lỗi thôi mà.",
+          "hypothesis": "Đừng lo lắng, ai cũng mắc lỗi thôi.",
+          "passed": true,
+          "required_coverage": 0.25,
+          "found_required": [
+            "đừng lo"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 207.6
+        },
+        {
+          "id": "ctx_it_001",
+          "preset": "IT",
+          "source": "Please deploy the latest commit to the staging server and verify the API endpoint.",
+          "reference": "Vui lòng deploy commit mới nhất lên staging server và kiểm tra lại API endpoint.",
+          "hypothesis": "Vui lòng triển khai phiên bản mới nhất lên máy chủ staging và kiểm tra điểm cuối API.",
+          "passed": true,
+          "required_coverage": 0.333,
+          "found_required": [
+            "staging",
+            "api"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 361.7
+        },
+        {
+          "id": "ctx_it_002",
+          "preset": "IT",
+          "source": "We encountered an out of memory error during the database migration in Kubernetes.",
+          "reference": "Chúng tôi gặp lỗi out of memory trong quá trình migration cơ sở dữ liệu trên Kubernetes.",
+          "hypothesis": "Chúng tôi gặp lỗi \"out of memory\" trong quá trình di chuyển cơ sở dữ liệu trên Kubernetes.",
+          "passed": true,
+          "required_coverage": 0.4,
+          "found_required": [
+            "kubernetes",
+            "memory"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 347.8
+        },
+        {
+          "id": "ctx_it_003",
+          "preset": "IT",
+          "source": "Make sure you push your branch and open a pull request before the CI pipeline runs.",
+          "reference": "Hãy chắc chắn bạn đã push branch và tạo pull request trước khi pipeline CI chạy.",
+          "hypothesis": "Hãy đảm bảo rằng bạn đã đẩy (push) các thay đổi lên và tạo một yêu cầu tổng hợp (pull request) trước khi quy trình kiểm thử tự động (CI pipeline) được thực hiện.",
+          "passed": true,
+          "required_coverage": 0.8,
+          "found_required": [
+            "push",
+            "pull request",
+            "ci",
+            "pipeline"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 651.8
+        },
+        {
+          "id": "ctx_medical_001",
+          "preset": "Medical",
+          "source": "The patient exhibits symptoms of acute respiratory infection and requires immediate diagnosis.",
+          "reference": "Bệnh nhân có các triệu chứng nhiễm trùng đường hô hấp cấp tính và cần được chẩn đoán ngay lập tức.",
+          "hypothesis": "Bệnh nhân có các triệu chứng của nhiễm trùng đường hô hấp cấp tính và cần được chẩn đoán ngay lập tức.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bệnh nhân",
+            "triệu chứng",
+            "hô hấp",
+            "chẩn đoán"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 413.1
+        },
+        {
+          "id": "ctx_medical_002",
+          "preset": "Medical",
+          "source": "Take this antibiotic twice daily after meals and monitor your blood pressure.",
+          "reference": "Uống kháng sinh này hai lần mỗi ngày sau bữa ăn và theo dõi huyết áp của bạn.",
+          "hypothesis": "Sử dụng thuốc kháng sinh này hai lần mỗi ngày, sau bữa ăn, và theo dõi huyết áp thường xuyên.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "kháng sinh",
+            "huyết áp",
+            "theo dõi",
+            "bữa ăn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 393.7
+        },
+        {
+          "id": "ctx_travel_001",
+          "preset": "Travel",
+          "source": "Excuse me, where is the baggage claim area for international arrivals?",
+          "reference": "Xin lỗi cho tôi hỏi, khu vực nhận hành lý cho các chuyến bay quốc tế ở đâu?",
+          "hypothesis": "Xin lỗi, vui lòng cho tôi biết khu vực lấy hành lý cho các chuyến bay quốc tế ở đâu?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hành lý",
+            "quốc tế",
+            "xin lỗi",
+            "ở đâu"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 378.6
+        },
+        {
+          "id": "ctx_travel_002",
+          "preset": "Travel",
+          "source": "I would like to check in for my flight and request a window seat, please.",
+          "reference": "Tôi muốn làm thủ tục lên máy bay và xin chọn một chỗ ngồi cạnh cửa sổ.",
+          "hypothesis": "Tôi muốn làm thủ tục check-in và yêu cầu chỗ ngồi ở vị trí gần cửa sổ, vui lòng.",
+          "passed": true,
+          "required_coverage": 0.5,
+          "found_required": [
+            "thủ tục",
+            "cửa sổ"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 417.1
+        },
+        {
+          "id": "ctx_general_001",
+          "preset": "General",
+          "source": "The weather forecast predicts heavy rain across the city this afternoon.",
+          "reference": "Dự báo thời tiết cho thấy chiều nay sẽ có mưa to trên khắp thành phố.",
+          "hypothesis": "Dự báo thời tiết cho thấy sẽ có mưa lớn trên khắp thành phố vào buổi chiều nay.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "thời tiết",
+            "mưa",
+            "chiều nay",
+            "thành phố"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 335.7
+        },
+        {
+          "id": "ctx_general_002",
+          "preset": "General",
+          "source": "Learning a new language opens up numerous opportunities in life.",
+          "reference": "Học một ngôn ngữ mới mở ra nhiều cơ hội trong cuộc sống.",
+          "hypothesis": "Học một ngôn ngữ mới mở ra rất nhiều cơ hội trong cuộc sống.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "ngôn ngữ",
+            "cơ hội",
+            "cuộc sống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 295.8
+        },
+        {
+          "id": "ctx_online_formal_000",
+          "preset": "Formal",
+          "source": "Will you please advise him to work harder?",
+          "reference": "Bạn sẽ vui lòng khuyên anh ấy làm việc chăm chỉ hơn không?",
+          "hypothesis": "Vui lòng nhắc nhở ông/bà hãy nỗ lực hơn nữa.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 311.2
+        },
+        {
+          "id": "ctx_online_formal_001",
+          "preset": "Formal",
+          "source": "Will you please advise him to work harder?",
+          "reference": "Bạn sẽ vui lòng khuyên nó làm việc chăm chỉ hơn không?",
+          "hypothesis": "Vui lòng nhắc nhở ông ấy cần nỗ lực hơn nữa.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 241.7
+        },
+        {
+          "id": "ctx_online_formal_002",
+          "preset": "Formal",
+          "source": "Will you please advise him to work harder?",
+          "reference": "Bạn sẽ vui lòng khuyên hắn làm việc chăm chỉ hơn không?",
+          "hypothesis": "Vui lòng nhắc nhở ông ấy cần nỗ lực hơn nữa.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 228.5
+        },
+        {
+          "id": "ctx_online_formal_003",
+          "preset": "Formal",
+          "source": "Will you show me your passport, please?",
+          "reference": "Xin ông vui lòng cho tôi xem hộ chiếu của ông.",
+          "hypothesis": "Xin vui lòng cho tôi xem hộ chiếu.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 163.4
+        },
+        {
+          "id": "ctx_online_formal_004",
+          "preset": "Formal",
+          "source": "Please return the book when you have finished reading it.",
+          "reference": "Vui lòng trả quyển sách nếu bạn đã đọc xong.",
+          "hypothesis": "Xin vui lòng trả lại cuốn sách sau khi bạn đã hoàn thành việc đọc.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 229.6
+        },
+        {
+          "id": "ctx_online_formal_005",
+          "preset": "Formal",
+          "source": "Please tell me how to pronounce this word.",
+          "reference": "Vui lòng nói cho tôi biết cách phát âm từ này.",
+          "hypothesis": "Vui lòng cho biết cách phát âm từ này.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 188.4
+        },
+        {
+          "id": "ctx_online_formal_006",
+          "preset": "Formal",
+          "source": "Please call the fire department.",
+          "reference": "Vui lòng gọi sở cứu hỏa.",
+          "hypothesis": "Vui lòng gọi cho bộ phận phòng cháy chữa cháy.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 224.5
+        },
+        {
+          "id": "ctx_online_formal_007",
+          "preset": "Formal",
+          "source": "Please tell me when he'll arrive here.",
+          "reference": "Vui lòng nói cho tôi biết khi nào anh ấy đến đây.",
+          "hypothesis": "Vui lòng cho tôi biết thời gian dự kiến ông sẽ đến.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 255.9
+        },
+        {
+          "id": "ctx_online_formal_008",
+          "preset": "Formal",
+          "source": "Please read the numbers on the meter.",
+          "reference": "Vui lòng đọc các con số trên đồng hồ đo điện.",
+          "hypothesis": "Vui lòng đọc số trên đồng hồ đo.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 187.1
+        },
+        {
+          "id": "ctx_online_formal_009",
+          "preset": "Formal",
+          "source": "Sign here, please.",
+          "reference": "Vui lòng ký vào đây.",
+          "hypothesis": "Vui lòng ký vào đây.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 143.7
+        },
+        {
+          "id": "ctx_online_formal_010",
+          "preset": "Formal",
+          "source": "Please explain why you can't come.",
+          "reference": "Xin vui lòng giải thích tại sao bạn không thể đến.",
+          "hypothesis": "Vui lòng cho biết lý do tại sao tôi không thể đến.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 222.4
+        },
+        {
+          "id": "ctx_online_formal_011",
+          "preset": "Formal",
+          "source": "\"I'm in a terrible hurry... for reasons I can't say,\" Dima replied to the woman. \"Please, just let me try on that suit there.\"",
+          "reference": "\"Tôi đang cực kỳ vội... vì những lý do tôi không thể nói ra,\" Dima trả lời người phụ nữ. \"Hãy vui lòng để tôi thử bộ đồ đó.\"",
+          "hypothesis": "Tôi đang rất gấp, vì những lý do tôi không thể chia sẻ,\" Dima trả lời người phụ nữ. \"Xin vui lòng, tôi muốn được thử chiếc áo khoác đó.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 517.1
+        },
+        {
+          "id": "ctx_online_formal_012",
+          "preset": "Formal",
+          "source": "Please stick this label to your baggage.",
+          "reference": "Vui lòng dán nhãn vào hành lý của bạn.",
+          "hypothesis": "Vui lòng dán nhãn này lên hành lý của Quý khách.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 227.8
+        },
+        {
+          "id": "ctx_online_formal_013",
+          "preset": "Formal",
+          "source": "Could you please turn down the heat?",
+          "reference": "Bạn có thể vui lòng giảm nhiệt độ xuống không?",
+          "hypothesis": "Xin vui lòng giảm nhiệt độ.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 118.9
+        },
+        {
+          "id": "ctx_online_formal_014",
+          "preset": "Formal",
+          "source": "Please do not write in this library book.",
+          "reference": "Vui lòng không viết vào sách của thư viện.",
+          "hypothesis": "Xin vui lòng dịch đoạn văn sau, đảm bảo tính chính xác, lưu ý văn phong trang trọng, lịch sự, phù hợp với giao tiếp kinh doanh:\n\n[Đoạn văn cần dịch]",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 554.3
+        },
+        {
+          "id": "ctx_online_formal_015",
+          "preset": "Formal",
+          "source": "An error occured while saving. Please try again or contact us to report this.",
+          "reference": "Lỗi phát sinh trong quá trình lưu dữ liệu. Vui lòng thử lại lần nữa hoặc liên hệ chúng tôi để báo cáo việc này.",
+          "hypothesis": "Đã xảy ra lỗi khi lưu. Vui lòng thử lại hoặc liên hệ với chúng tôi để báo cáo sự cố này.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 355.5
+        },
+        {
+          "id": "ctx_online_formal_016",
+          "preset": "Formal",
+          "source": "The user you to want to send this message to does not exist. Please try with another username.",
+          "reference": "Người dùng bạn muốn gởi tin này đến không tồn tại. Vui lòng thử tên khác.",
+          "hypothesis": "Người dùng mà bạn muốn gửi tin nhắn không tồn tại. Vui lòng thử với một tên người dùng khác.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vui lòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 316.5
+        },
+        {
+          "id": "ctx_online_friendly_000",
+          "preset": "Friendly",
+          "source": "It's because you don't want to be alone.",
+          "reference": "Đó là vì bạn không muốn đơn độc.",
+          "hypothesis": "Chính vì vậy, bạn không muốn một mình.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 175.2
+        },
+        {
+          "id": "ctx_online_friendly_001",
+          "preset": "Friendly",
+          "source": "I'll do my best not to disturb your studying.",
+          "reference": "Tôi sẽ cố không quấy rầy bạn học hành.",
+          "hypothesis": "Mình sẽ cố gắng không làm phiền bạn khi bạn đang học.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 209.3
+        },
+        {
+          "id": "ctx_online_friendly_002",
+          "preset": "Friendly",
+          "source": "You should sleep.",
+          "reference": "Bạn nên đi ngủ đi.",
+          "hypothesis": "Bạn nên đi ngủ.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 106.1
+        },
+        {
+          "id": "ctx_online_friendly_003",
+          "preset": "Friendly",
+          "source": "That's because you're a girl.",
+          "reference": "Cái đó tại vì bạn là đàn bà.",
+          "hypothesis": "Chính vì bạn là nữ giới nên như vậy.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 175.8
+        },
+        {
+          "id": "ctx_online_friendly_004",
+          "preset": "Friendly",
+          "source": "How many close friends do you have?",
+          "reference": "Bạn có bao nhiêu bạn thân?",
+          "hypothesis": "Bạn có bao nhiêu người bạn thân thiết?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 145.6
+        },
+        {
+          "id": "ctx_online_friendly_005",
+          "preset": "Friendly",
+          "source": "The police will get you to find the bullets.",
+          "reference": "Cảnh sát sẽ bắt bạn tìm ra mấy viên đạn.",
+          "hypothesis": "Cảnh sát sẽ giúp bạn tìm những viên đạn đó.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 189.4
+        },
+        {
+          "id": "ctx_online_friendly_006",
+          "preset": "Friendly",
+          "source": "I don't know what you mean.",
+          "reference": "Tôi không biết ý của bạn là gì.",
+          "hypothesis": "Mình không hiểu ý bạn.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 106.1
+        },
+        {
+          "id": "ctx_online_friendly_007",
+          "preset": "Friendly",
+          "source": "You wanted to tell me about freedom?",
+          "reference": "Bạn muốn nói với tôi về sự tự do hả?",
+          "hypothesis": "Bạn muốn kể cho tôi nghe về tự do?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 155.4
+        },
+        {
+          "id": "ctx_online_friendly_008",
+          "preset": "Friendly",
+          "source": "No, he's not my new boyfriend.",
+          "reference": "Không, anh ấy không phải bạn trai mới của tôi.",
+          "hypothesis": "Không, anh ấy không phải là bạn trai mới của tôi.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 196.8
+        },
+        {
+          "id": "ctx_online_friendly_009",
+          "preset": "Friendly",
+          "source": "You never have class or what?!",
+          "reference": "Bạn không bao giờ có lớp hay sao?",
+          "hypothesis": "Không có giờ học, đúng không?",
+          "passed": false,
+          "required_coverage": 0.0,
+          "found_required": [],
+          "found_forbidden": [],
+          "latency_ms": 131.9
+        },
+        {
+          "id": "ctx_online_friendly_010",
+          "preset": "Friendly",
+          "source": "Why don't you come visit us?",
+          "reference": "Sao bạn không tới thăm tụi tôi?",
+          "hypothesis": "Sao bạn không đến thăm chúng tôi nhỉ?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 145.5
+        },
+        {
+          "id": "ctx_online_friendly_011",
+          "preset": "Friendly",
+          "source": "You can probably guess what happens though.",
+          "reference": "Chắc bạn cũng đoán được cái gì xảy ra mà.",
+          "hypothesis": "Chắc hẳn mọi chuyện sẽ diễn ra như thế này.",
+          "passed": false,
+          "required_coverage": 0.0,
+          "found_required": [],
+          "found_forbidden": [],
+          "latency_ms": 190.0
+        },
+        {
+          "id": "ctx_online_friendly_012",
+          "preset": "Friendly",
+          "source": "What do you think I've been doing?",
+          "reference": "Bạn nghĩ tôi đang làm gì?",
+          "hypothesis": "Bạn nghĩ tôi đang làm gì vậy?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 152.4
+        },
+        {
+          "id": "ctx_online_friendly_013",
+          "preset": "Friendly",
+          "source": "Everyone wants to meet you. You're famous!",
+          "reference": "Mọi người muốn gặp bạn vì bạn nổi tiếng!",
+          "hypothesis": "Mọi người đều muốn gặp bạn. Bạn nổi tiếng quá!",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 245.3
+        },
+        {
+          "id": "ctx_online_friendly_014",
+          "preset": "Friendly",
+          "source": "What keeps you up so late?",
+          "reference": "Bạn làm gì mà thức khuya quá vậy?",
+          "hypothesis": "Sao bạn thức khuya vậy?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 127.5
+        },
+        {
+          "id": "ctx_online_friendly_015",
+          "preset": "Friendly",
+          "source": "You're not fast enough.",
+          "reference": "Bạn không đủ nhanh.",
+          "hypothesis": "Bạn cần phải nhanh hơn.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 116.9
+        },
+        {
+          "id": "ctx_online_friendly_016",
+          "preset": "Friendly",
+          "source": "Are you referring to me?",
+          "reference": "Bạn đang nói về tôi à?",
+          "hypothesis": "Bạn có đang nói về tôi không?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 153.3
+        },
+        {
+          "id": "ctx_online_it_000",
+          "preset": "IT",
+          "source": "But when we don;t use quotes, the computer reads 3 plus 4 plus 5 as numbers.",
+          "reference": "Ngược lại, nếu chúng ta không dùng dấu ngoặc, máy tính xem 3 + 4 + 5 như những con số.",
+          "hypothesis": "Tuy nhiên, khi chúng ta không sử dụng dấu ngoặc kép, máy tính sẽ hiểu \"3 + 4 + 5\" như là các số, thay vì biểu thức toán học.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "máy tính"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 590.2
+        },
+        {
+          "id": "ctx_online_it_001",
+          "preset": "IT",
+          "source": "The technology there was much more difficult than what I'm dealing with here.",
+          "reference": "Công nghệ ở đó khó khăn hơn những gì tôi đang đối mặt ở đây.",
+          "hypothesis": "Công nghệ ở đó phức tạp hơn rất nhiều so với những gì tôi đang phải đối mặt ở đây.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "công nghệ"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 315.6
+        },
+        {
+          "id": "ctx_online_it_002",
+          "preset": "IT",
+          "source": "Historically you see that we got around 200 years ago by canals, and as that system disappeared, were replaced by railroads.",
+          "reference": "Về mặt lịch sử, chúng ta đi đây đó thông qua nhiều kênh đào suốt 200 năm, và từ từ hệ thống đó dần biến mất, được thay thế bằng đường sắt.",
+          "hypothesis": "Theo lịch sử, chúng ta đã sử dụng kênh đào để vận chuyển hàng hóa khoảng 200 năm trước. Khi hệ thống kênh đào này trở nên không hiệu quả, chúng đã được thay thế bằng đường sắt.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 624.9
+        },
+        {
+          "id": "ctx_online_it_003",
+          "preset": "IT",
+          "source": "But if you look at that top corner -- the highway system -- you see where we are today.",
+          "reference": "Nhưng nếu nhìn vào góc trên cùng -- hệ thống đường cao tốc -- bạn có thể thấy hiện tại.",
+          "hypothesis": "Tuy nhiên, nếu bạn nhìn vào góc trên cùng – hệ thống đường cao tốc – bạn sẽ thấy chúng ta đang ở đâu.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 380.0
+        },
+        {
+          "id": "ctx_online_it_004",
+          "preset": "IT",
+          "source": "It makes use of the GPS -- you're familiar with GPS in your automobile, but you may not be familiar with the fact that there's a GPS U.S., there's a Russian GPS, and there's a new GPS system going to Europe, called Galileo.",
+          "reference": "Nó tận dụng hệ thống định vị GPS- bạn đã biết GPS trên điện thoại rồi- nhưng có lẽ bạn chưa quen với việc có một hệ thống GPS của Mĩ, một hệ thống GPS của Nga, và có một hệ thống GPS mới dự kiến đưa vào Châu Âu, tên là Galileo.",
+          "hypothesis": "Hệ thống này sử dụng GPS – bạn đã quen thuộc với GPS trong xe hơi, nhưng có thể bạn chưa biết rằng có hệ thống GPS của Mỹ, hệ thống GPS của Nga, và một hệ thống GPS mới do châu Âu phát triển, được gọi là Galileo.",
+          "passed": true,
+          "required_coverage": 0.5,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 758.1
+        },
+        {
+          "id": "ctx_online_it_005",
+          "preset": "IT",
+          "source": "With those three systems, you have what is always necessary -- a level of redundancy that says, if one system fails, you'll still have a way to make sure that you're being controlled.",
+          "reference": "Với 3 hệ thống đó, bạn lúc nào cũng có những gì mình cần - nói một cách hơi dư thừa là, nếu một hệ thống thất bại, bạn vẫn còn có cách để đảm bảo rằng bạn điều chỉnh được.",
+          "hypothesis": "Với ba hệ thống này, bạn sẽ có mức độ dự phòng cần thiết, đảm bảo rằng ngay cả khi một hệ thống gặp sự cố, bạn vẫn có thể tiếp tục kiểm soát và hoạt động.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 565.5
+        },
+        {
+          "id": "ctx_online_it_006",
+          "preset": "IT",
+          "source": "Because if you're in this world, where computers are controlling what you're doing, it's going to be very critical that something can't fail on you.",
+          "reference": "Vì trong thế giới này, nơi máy tính đang kiểm soát mọi việc bạn làm, điều mấu chốt là bạn khó có thể thất bại khi làm một việc nào đó.",
+          "hypothesis": "Bởi vì, trong thế giới nơi máy tính điều khiển mọi hoạt động, việc đảm bảo rằng mọi thứ phải hoạt động hoàn hảo là vô cùng quan trọng.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "máy tính"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 461.9
+        },
+        {
+          "id": "ctx_online_it_007",
+          "preset": "IT",
+          "source": "I was a professor at the U.C. Davis System, and I got a lot of excitement around this, and I was able to fund the initiation of the program back in that time.",
+          "reference": "Tôi là một giáo sư ở hệ thống U.C. Davis, và tôi vô cùng háo hức trong chuyện này, và tôi đã có thể gây quĩ khởi xướng chương trình ngay lúc đó.",
+          "hypothesis": "Tôi từng là giảng viên tại hệ thống trường Đại học California, Davis, và tôi nhận được sự quan tâm lớn về dự án này. Tôi cũng có thể đảm bảo nguồn tài chính để bắt đầu chương trình.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 591.0
+        },
+        {
+          "id": "ctx_online_it_008",
+          "preset": "IT",
+          "source": "A vertical-takeoff aircraft needs an artificial stabilization system -- that's essential.",
+          "reference": "Chiếc máy bay phản lực cất cánh thẳng đứng cần một hệ thống ổn định nhân tạo - điều đó là cần thiết.",
+          "hypothesis": "Một máy bay có khả năng cất cánh thẳng đứng cần một hệ thống ổn định nhân tạo – đây là điều cần thiết.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 369.2
+        },
+        {
+          "id": "ctx_online_it_009",
+          "preset": "IT",
+          "source": "If that single-stability system, that brain that flies that aircraft, fails, or if the engine fails, that vehicle crashes.",
+          "reference": "Nếu với hệ thống đơn giản cố định đó, não bộ điều khiển cái máy bay đó, hoặc động cơ bị hỏng phương tiện sẽ đó gặp nạn.",
+          "hypothesis": "Nếu hệ thống duy trì sự ổn định đó, bộ não điều khiển máy bay, gặp sự cố hoặc động cơ bị lỗi, thì toàn bộ hệ thống sẽ sụp đổ và máy bay sẽ rơi.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 570.1
+        },
+        {
+          "id": "ctx_online_it_010",
+          "preset": "IT",
+          "source": "And the adage that I'm referring to, that applied at that time, was that nothing comes down faster than a VTOL aircraft upside down.",
+          "reference": "Và có câu châm ngôn mà tôi định đề cập, ứng dụng được vào thời điểm đó, đó là không có gì rơi xuống nhanh hơn so với máy bay phản lực VTOL lộn ngược.",
+          "hypothesis": "Và câu nói phổ biến thời điểm đó là: \"Không có gì rơi nhanh hơn một chiếc máy bay VTOL (cất cánh và hạ cánh thẳng đứng) khi đang rơi ngược.",
+          "passed": false,
+          "required_coverage": 0.0,
+          "found_required": [],
+          "found_forbidden": [],
+          "latency_ms": 547.3
+        },
+        {
+          "id": "ctx_online_it_011",
+          "preset": "IT",
+          "source": "It fits exactly where we need to fit it, right in the center of the hubs of the ducts in the system -- very critical.",
+          "reference": "Nó hoàn toàn phù hợp với những gì chúng ta cần, ngay vị trí giữa trục ống trong hệ thống - rất quan trọng.",
+          "hypothesis": "Nó phù hợp hoàn hảo ở vị trí chúng ta cần, chính xác ở trung tâm các điểm kết nối trong hệ thống – đây là một yếu tố rất quan trọng.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "hệ thống"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 507.2
+        },
+        {
+          "id": "ctx_online_it_012",
+          "preset": "IT",
+          "source": "In fact that engine -- for those who are into the automobile -- know that it recently is applied to the RX8 -- the Mazda.",
+          "reference": "Thật ra động cơ đó - dành cho những ai yêu thích ô tô - được biết gần đây nó được ứng dụng cho chiếc RX8 - của hãng Mazda.",
+          "hypothesis": "Trên thực tế, động cơ này – đối với những người quan tâm đến lĩnh vực ô tô – đã được ứng dụng trong mẫu xe Mazda RX8 gần đây.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "ứng dụng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 468.7
+        },
+        {
+          "id": "ctx_online_it_013",
+          "preset": "IT",
+          "source": "In that application, it generates one horsepower per pound, which is twice as good as your car engine today, but only half of what we need.",
+          "reference": "Trong quá trình áp dụng, nó tạo ra 1 mã lực 1 pound tốt gấp đôi động cơ ô tô ngày nay, nhưng chỉ có môt nửa so với những gì chúng ta cần.",
+          "hypothesis": "Trong ứng dụng đó, nó tạo ra một mã lực trên mỗi pound, gấp đôi so với động cơ ô tô hiện tại, nhưng chỉ bằng một nửa so với nhu cầu.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "mã"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 508.6
+        },
+        {
+          "id": "ctx_online_it_014",
+          "preset": "IT",
+          "source": "My company has spent 35 years and many millions of dollars taking that rotary engine, which was invented in the late '50s, and getting it to the point that we get over two horsepower per pound, reliably, and critical.",
+          "reference": "Công ti của tôi đã thử nghiệm 35 năm và chi hàng triệu đô la để dùng động cơ pít tông quay đó, loại động cơ được phát minh vào cuối những năm 50, và nâng nó lên hơn 2 mã lực 1 pound, rất đáng tin, và rất quan trọng.",
+          "hypothesis": "Công ty chúng tôi đã dành 35 năm và chi hàng triệu đô la để phát triển động cơ quay, một công nghệ được phát minh vào cuối những năm 1950, đến mức chúng tôi có thể đạt được hiệu suất trên 2 mã lực trên mỗi pound, một cách đáng tin cậy và quan trọng.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "mã"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 925.7
+        },
+        {
+          "id": "ctx_online_it_015",
+          "preset": "IT",
+          "source": "We actually get 175 horsepower into one cubic foot.",
+          "reference": "Chúng ta thật sự có được 175 mã lực trong 1 mét khối.",
+          "hypothesis": "Chúng tôi đạt được công suất khoảng 175 mã lực trên mỗi feet khối.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "mã"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 274.9
+        },
+        {
+          "id": "ctx_online_it_016",
+          "preset": "IT",
+          "source": "We have four computers.",
+          "reference": "Chúng ta có 4 chiếc máy tính.",
+          "hypothesis": "Chúng tôi có bốn máy tính.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "máy tính"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 128.0
+        },
+        {
+          "id": "ctx_online_medical_000",
+          "preset": "Medical",
+          "source": "Dr. Ehud Ur, professor of medicine at Dalhousie University in Halifax, Nova Scotia and chair of the clinical and scientific division of the Canadian Diabetes Association cautioned that the research is still in its early days.",
+          "reference": "Tiến sĩ Ehud Ur, giáo sư y khoa của Trường Đại học Dalhousie ở Halifax, Nova Scotia và là chủ tịch ban lâm sàng và khoa học của Hiệp hội Bệnh Tiểu đường Canada cảnh báo rằng nghiên cứu này chỉ mới là sự khởi đầu.",
+          "hypothesis": "Tiến sĩ Ehud Ur, giáo sư y học tại Đại học Dalhousie ở Halifax, Nova Scotia, và chủ tịch bộ phận lâm sàng và khoa học của Hiệp hội Đái tháo đường Canada, đã cảnh báo rằng nghiên cứu này vẫn đang ở giai đoạn đầu.",
+          "passed": false,
+          "required_coverage": 0.0,
+          "found_required": [],
+          "found_forbidden": [],
+          "latency_ms": 802.7
+        },
+        {
+          "id": "ctx_online_medical_001",
+          "preset": "Medical",
+          "source": "Like some other experts, he is skeptical about whether diabetes can be cured, noting that these findings have no relevance to people who already have Type 1 diabetes.",
+          "reference": "Giống như một số chuyên gia khác, ông ấy hoài nghi về khả năng chữa bệnh tiểu đường, với lưu ý rằng các phát hiện này không liên quan tới người đã bị tiểu đường tuýp 1.",
+          "hypothesis": "Tương tự như một số chuyên gia khác, ông tỏ ra hoài nghi về khả năng chữa khỏi bệnh tiểu đường, nhấn mạnh rằng những phát hiện này không có ý nghĩa đối với những người đã mắc bệnh tiểu đường loại 1.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bệnh"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 664.0
+        },
+        {
+          "id": "ctx_online_medical_002",
+          "preset": "Medical",
+          "source": "While one experimental vaccine appears able to reduce Ebola mortality, up until now, no drugs have been clearly demonstrated suitable for treating existing infection.",
+          "reference": "Trong khi một vắc-xin thử nghiệm có vẻ như có khả năng làm giảm tỷ lệ tử vong do Ebola, cho tới nay, chưa có loại thuốc nào được chứng minh rõ ràng là phù hợp cho việc điều trị căn bệnh lây nhiễm này.",
+          "hypothesis": "Mặc dù một loại vaccine thử nghiệm có vẻ hiệu quả trong việc giảm tỷ lệ tử vong do bệnh Ebola, hiện tại, chưa có loại thuốc nào được chứng minh rõ ràng là có hiệu quả trong việc điều trị bệnh đang diễn ra.",
+          "passed": true,
+          "required_coverage": 0.75,
+          "found_required": [
+            "bệnh",
+            "thuốc",
+            "điều trị"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 664.3
+        },
+        {
+          "id": "ctx_online_medical_003",
+          "preset": "Medical",
+          "source": "In the PALM trial, ZMapp served as a control, meaning scientists used it as a baseline and compared the three other treatments to it.",
+          "reference": "Trong lần thử PALM, ZMapp đóng vai trò là tiêu chuẩn so sánh, có nghĩ là các nhà khoa học sử dụng nó như là đường cơ sở và so sánh ba cách điều trị khác với nó.",
+          "hypothesis": "Trong thử nghiệm PALM, ZMapp được sử dụng làm nhóm đối chứng, nghĩa là các nhà khoa học sử dụng nó như một tiêu chuẩn tham chiếu và so sánh hiệu quả của ba phương pháp điều trị khác với ZMapp.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "điều trị"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 667.1
+        },
+        {
+          "id": "ctx_online_medical_004",
+          "preset": "Medical",
+          "source": "Hu encouraged developing countries \"to avoid the old path of polluting first and cleaning up later.\"",
+          "reference": "Ông khuyến khích các nước đang phát triển nên “tránh đi theo vết xe đổ là gây ô nhiễm trước rồi mới làm sạch sau”.",
+          "hypothesis": "Hu khuyến khích các nước đang phát triển \"tránh con đường cũ là gây ô nhiễm trước và xử lý hậu quả sau.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "nhiễm"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 382.8
+        },
+        {
+          "id": "ctx_online_medical_005",
+          "preset": "Medical",
+          "source": "Ever since the Federal Government stepped in to take over funding of the Mersey hospital in Devonport, Tasmania, the state government and some federal MPs have criticised this act as a stunt in the prelude to the federal election to be called by November.",
+          "reference": "Kể từ khi Chính quyền Liên bang bắt đầu đảm nhận kinh phí cho bệnh viện Mersey ở Devonport, Tasmania, chính quyền tiểu bang và một số Thành viên Quốc hội liên bang đã chỉ trích hành động này là trò quảng cáo dạo đầu cho cuộc bầu cử liên bang sắp diễn ra vào tháng 11.",
+          "hypothesis": "Ngay từ khi chính phủ liên bang can thiệp và đảm bảo nguồn tài chính cho bệnh viện Mersey ở Devonport, Tasmania, chính phủ tiểu bang và một số nghị sĩ liên bang đã chỉ trích hành động này, coi đó là một động thái nhằm tạo ấn tượng trước cuộc bầu cử liên bang dự kiến diễn ra vào tháng 11.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bệnh"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 976.3
+        },
+        {
+          "id": "ctx_online_medical_006",
+          "preset": "Medical",
+          "source": "But Prime Minister John Howard has said the act was only to safeguard the facilities of the hospital from being downgraded by the Tasmanian government, in giving an extra AUD$45 million.",
+          "reference": "Tuy nhiên, Thủ Tướng John Howard cho biết hành động này chỉ nhằm bảo vệ các cơ sở vật chất của bệnh viện khỏi tình trạng xuống cấp do chính phủ Tasmania tác động cùng với việc trao thêm $45 triệu AUD.",
+          "hypothesis": "Tuy nhiên, Thủ tướng John Howard cho biết, hành động này chỉ nhằm bảo vệ cơ sở vật chất của bệnh viện khỏi bị giảm hạng do chính phủ Tasmania, khi cấp thêm 45 triệu đô la Úc.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bệnh"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 616.1
+        },
+        {
+          "id": "ctx_online_medical_007",
+          "preset": "Medical",
+          "source": "Dr. Tony Moll discovered the Extremely Drug Resistant Tuberculosis (XDR-TB) in the South African region KwaZulu-Natal.",
+          "reference": "Bác sĩ Tony Moll đã phát hiện ra Bệnh lao Siêu Kháng thuốc (XDR-TB) tại khu vực KwaZulu-Natal, Nam Phi.",
+          "hypothesis": "Bác sĩ Tony Moll đã phát hiện ra loại lao kháng thuốc cực mạnh (XDR-TB) tại khu vực KwaZulu-Natal, Nam Phi.",
+          "passed": true,
+          "required_coverage": 0.667,
+          "found_required": [
+            "bác sĩ",
+            "thuốc"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 435.9
+        },
+        {
+          "id": "ctx_online_medical_008",
+          "preset": "Medical",
+          "source": "Some patients might have contracted the bug in the hospital, Dr. Moll thinks, and at least two were hospital health workers.",
+          "reference": "Bác sĩ Moll nghĩ rằng một số bệnh nhân có thể đã bị lây rệp ở bệnh viện và ít nhất hai người là nhân viên y tế trong bệnh viện.",
+          "hypothesis": "Bác sĩ Moll cho rằng, một số bệnh nhân có thể đã nhiễm bệnh tại bệnh viện, và ít nhất hai người trong số đó là nhân viên y tế của bệnh viện.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bệnh",
+            "bác sĩ",
+            "y tế",
+            "bệnh nhân"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 513.6
+        },
+        {
+          "id": "ctx_online_medical_009",
+          "preset": "Medical",
+          "source": "In one year's time, an infected person may infect 10 to 15 close contacts.",
+          "reference": "Trong vòng một năm thì một người nhiễm bệnh có thể truyền cho 10 đến 15 người tiếp xúc gần.",
+          "hypothesis": "Trong vòng một năm, một người bị nhiễm bệnh có thể lây truyền cho 10 đến 15 người thân cận.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bệnh",
+            "nhiễm"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 383.8
+        },
+        {
+          "id": "ctx_online_medical_010",
+          "preset": "Medical",
+          "source": "However, the percentage of XDR-TB in the entire group of people with tuberculosis still seems to be low; 6,000 of the total 330,000 people infected at any particular moment in South Africa.",
+          "reference": "Tuy nhiên, dường như tỷ lệ XDR-TB trong tổng số người mắc bệnh lao vẫn còn ở mức thấp; chỉ có 6.000 trong tổng số 330.000 người bị nhiễm bệnh tại một thời điểm cụ thể bất kỳ tại Nam Phi.",
+          "hypothesis": "Tuy nhiên, tỷ lệ bệnh lao kháng kháng sinh (XDR-TB) trong tổng số người mắc bệnh lao tại Nam Phi vẫn dường như còn thấp; chỉ khoảng 6.000 trên tổng số 330.000 người mắc bệnh lao tại bất kỳ thời điểm cụ thể nào.",
+          "passed": true,
+          "required_coverage": 0.5,
+          "found_required": [
+            "bệnh"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 880.0
+        },
+        {
+          "id": "ctx_online_medical_011",
+          "preset": "Medical",
+          "source": "A doctor who worked at Children's Hospital of Pittsburgh, Pennsylvania will be charged with aggravated murder after her mother was found dead in the trunk of her car Wednesday, authorities in Ohio say.",
+          "reference": "Một bác sĩ làm việc tại Bệnh viện Nhi Pittsburgh, Pennsylvania sẽ bị buộc tội giết người nghiêm trọng sau khi mẹ cô ta được tìm thấy đã chết trong cốp xe hơi của cô ta vào ngày thứ Tư, cơ quan thẩm quyền ở Ohio cho biết.",
+          "hypothesis": "Một bác sĩ, người từng làm việc tại Bệnh viện Nhi Pittsburgh, Pennsylvania, sẽ bị buộc tội giết người vì động cơ thù hận sau khi mẹ của bà được phát hiện đã qua đời trong cốp xe vào ngày thứ Tư, theo thông tin từ cơ quan chức năng ở Ohio.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bệnh",
+            "bác sĩ"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 831.1
+        },
+        {
+          "id": "ctx_online_medical_012",
+          "preset": "Medical",
+          "source": "Dr. Malar Balasubramanian, 29, was found in Blue Ash, Ohio, a suburb approximately 15 miles north of Cincinnati lying on the ground beside the road in a T-shirt and underwear in an apparently heavily medicated state.",
+          "reference": "Bác sĩ Malar Balasubramanian, 29 tuổi, được phát hiện nằm trên mặt đất ven đường trong trang phục áo thun và đồ lót nồng nặc thuốc ở Blue Ash, một vùng ngoại ô cách Cincinnati 15 dặm về phía bắc.",
+          "hypothesis": "Bác sĩ Malar Balasubramanian, 29 tuổi, được phát hiện tại Blue Ash, Ohio, một khu vực ngoại ô cách Cincinnati khoảng 15 dặm về phía bắc, nằm trên đường, mặc áo phông và quần lót, trong tình trạng có vẻ như đã được dùng thuốc quá liều.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "bác sĩ",
+            "thuốc"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 950.3
+        },
+        {
+          "id": "ctx_online_travel_000",
+          "preset": "Travel",
+          "source": "Round trip? Only one-way.",
+          "reference": "Vé khứ hồi phải không? Một chiều thôi.",
+          "hypothesis": "Đi một chiều?",
+          "passed": false,
+          "required_coverage": 0.0,
+          "found_required": [],
+          "found_forbidden": [],
+          "latency_ms": 100.8
+        },
+        {
+          "id": "ctx_online_travel_001",
+          "preset": "Travel",
+          "source": "Don't forget the ticket.",
+          "reference": "Xin đừng quên vé.",
+          "hypothesis": "Xin vui lòng giữ vé.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "vé"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 113.7
+        },
+        {
+          "id": "ctx_online_travel_002",
+          "preset": "Travel",
+          "source": "How far is it to the airport?",
+          "reference": "Đến sân bay xa bao nhiêu?",
+          "hypothesis": "Từ đây đến sân bay cách khoảng bao xa?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "sân bay"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 164.8
+        },
+        {
+          "id": "ctx_online_travel_003",
+          "preset": "Travel",
+          "source": "Where do I get an airport bus?",
+          "reference": "Tôi có thể tìm một chiếc xe buýt đưa đón cho sân bay ở đâu?",
+          "hypothesis": "Tôi có thể đi xe buýt đưa đón sân bay ở đâu?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "sân bay"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 215.6
+        },
+        {
+          "id": "ctx_online_travel_004",
+          "preset": "Travel",
+          "source": "How long does the airport bus take to the airport?",
+          "reference": "Xe buýt sân bay tới sân bay mất bao nhiêu lâu?",
+          "hypothesis": "Xe buýt đưa đến sân bay mất bao lâu?",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "sân bay"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 177.9
+        },
+        {
+          "id": "ctx_online_travel_005",
+          "preset": "Travel",
+          "source": "I want to get a sightseeing visa.",
+          "reference": "Tôi muốn có một thị thực du lịch.",
+          "hypothesis": "Tôi muốn xin visa du lịch.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "du lịch"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 131.6
+        },
+        {
+          "id": "ctx_online_travel_006",
+          "preset": "Travel",
+          "source": "Arriving at the station, I found my train gone.",
+          "reference": "Đến nhà ga thì tôi mới phát hiện chuyến tàu đã khởi hành rồi.",
+          "hypothesis": "Khi đến nhà ga, tôi phát hiện tàu đã đi.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "nhà ga"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 198.6
+        },
+        {
+          "id": "ctx_online_travel_007",
+          "preset": "Travel",
+          "source": "I'd like a hotel reservation.",
+          "reference": "Tôi muốn đặt phòng khách sạn.",
+          "hypothesis": "Tôi muốn đặt phòng khách sạn.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "khách sạn",
+            "đặt phòng"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 126.9
+        },
+        {
+          "id": "ctx_online_travel_008",
+          "preset": "Travel",
+          "source": "Please get me hotel security.",
+          "reference": "Làm ơn cho tôi gặp bảo vệ khách sạn.",
+          "hypothesis": "Xin gọi bảo vệ khách sạn.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "khách sạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 127.4
+        },
+        {
+          "id": "ctx_online_travel_009",
+          "preset": "Travel",
+          "source": "The Hilton Hotel, please.",
+          "reference": "Làm ơn chở tôi tới khách sạn Hilton.",
+          "hypothesis": "Xin vui lòng đưa tôi đến khách sạn Hilton.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "khách sạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 166.3
+        },
+        {
+          "id": "ctx_online_travel_010",
+          "preset": "Travel",
+          "source": "The new hotel invited suggestions from the guests.",
+          "reference": "Khách sạn mới mời gọi các người khách giới thiệu.",
+          "hypothesis": "Khách sạn mới mời khách hàng đóng góp ý kiến.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "khách sạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 191.4
+        },
+        {
+          "id": "ctx_online_travel_011",
+          "preset": "Travel",
+          "source": "The hotel is at the foot of a mountain.",
+          "reference": "Khách sạn đó nằm dưới chân núi.",
+          "hypothesis": "Khách sạn nằm ở chân núi.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "khách sạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 143.3
+        },
+        {
+          "id": "ctx_online_travel_012",
+          "preset": "Travel",
+          "source": "This hotel is relatively expensive for this town.",
+          "reference": "Khách sạn này có giá cả khá đắt so với một thị trấn như thế này.",
+          "hypothesis": "Giá phòng ở khách sạn này tương đối cao so với mức giá trung bình của khu vực.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "khách sạn"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 281.7
+        },
+        {
+          "id": "ctx_online_general_000",
+          "preset": "General",
+          "source": "\"We now have 4-month-old mice that are non-diabetic that used to be diabetic,\" he added.",
+          "reference": "“Chúng tôi hiện có đàn chuột 4 tháng tuổi đã hết bị tiểu đường,” ông nói thêm.",
+          "hypothesis": "Chúng tôi hiện có chuột 4 tháng tuổi, vốn trước đây mắc bệnh tiểu đường, nhưng giờ đây đã khỏi bệnh,\" ông nói thêm.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "chuột",
+            "tháng",
+            "đường"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 428.7
+        },
+        {
+          "id": "ctx_online_general_001",
+          "preset": "General",
+          "source": "Danius said, \"Right now we are doing nothing. I have called and sent emails to his closest collaborator and received very friendly replies. For now, that is certainly enough.\"",
+          "reference": "Danius đã nói, “Ngay lúc này chúng ta chẳng làm gì cả. Tôi đã gọi và gửi email cho đối tác thân cận nhất của anh ta và nhận được phản hồi rất thân thiện. Hiện tại, như vậy là đủ.”",
+          "hypothesis": "Danius nói: \"Hiện tại, chúng tôi chưa làm gì cả. Tôi đã gọi điện và gửi email cho người cộng tác gần gũi nhất của ông ấy và nhận được phản hồi rất thân thiện. Cho đến lúc này, đó là đủ rồi.",
+          "passed": true,
+          "required_coverage": 0.667,
+          "found_required": [
+            "danius",
+            "email"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 807.1
+        },
+        {
+          "id": "ctx_online_general_002",
+          "preset": "General",
+          "source": "Previously, Ring's CEO, Jamie Siminoff, remarked the company started when his doorbell wasn't audible from his shop in his garage.",
+          "reference": "Trước đây, giám đốc điều hành của Ring, Jamie Siminoff, đã phát biểu rằng công ty ra đời khi ông không nghe tiếng chuông cửa khi đang khi ở trong gara.",
+          "hypothesis": "Trước đây, CEO của Ring, Jamie Siminoff, đã nói rằng công ty bắt đầu khi ông không thể nghe thấy tiếng chuông cửa từ cửa hàng của mình, nằm trong gara.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "siminoff",
+            "chuông",
+            "jamie"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 556.2
+        },
+        {
+          "id": "ctx_online_general_003",
+          "preset": "General",
+          "source": "He built a WiFi door bell, he said.",
+          "reference": "Ông đã lắp môt chuông cửa WiFi, ông cho biết.",
+          "hypothesis": "Anh ấy đã tự chế một chiếc chuông cửa có kết nối Wi-Fi, theo lời anh ấy.",
+          "passed": true,
+          "required_coverage": 0.333,
+          "found_required": [
+            "chuông"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 349.7
+        },
+        {
+          "id": "ctx_online_general_004",
+          "preset": "General",
+          "source": "Siminoff said sales boosted after his 2013 appearance in a Shark Tank episode where the show panel declined funding the startup.",
+          "reference": "Siminoff cho biết doanh số tăng sau sự xuất hiện của mình vào năm 2013 trong một tập Shark Tank khi hội đồng giám khảo chương trình đã từ chối tài trợ cho công ty khởi nghiệp.",
+          "hypothesis": "Siminoff cho biết doanh số tăng sau khi ông xuất hiện trong tập của chương trình Shark Tank năm 2013, nơi hội đồng thẩm định từ chối đầu tư cho công ty khởi nghiệp của ông.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "siminoff",
+            "chương",
+            "nghiệp"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 622.2
+        },
+        {
+          "id": "ctx_online_general_005",
+          "preset": "General",
+          "source": "In late 2017, Siminoff appeared on shopping television channel QVC.",
+          "reference": "Vào cuối năm 2017, Siminoff xuất hiện trên kênh truyền hình mua sắm QVC.",
+          "hypothesis": "Đầu năm 2018, Siminoff xuất hiện trên kênh truyền hình mua sắm QVC.",
+          "passed": true,
+          "required_coverage": 0.667,
+          "found_required": [
+            "siminoff",
+            "truyền"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 339.5
+        },
+        {
+          "id": "ctx_online_general_006",
+          "preset": "General",
+          "source": "Ring also settled a lawsuit with competing security company, the ADT Corporation.",
+          "reference": "Ring cũng đã dàn xếp một vụ kiện với một công ty an ninh đối thủ là ADT Corporation.",
+          "hypothesis": "Công ty Ring cũng đã giải quyết một vụ kiện với công ty an ninh đối thủ, ADT Corporation.",
+          "passed": true,
+          "required_coverage": 1.0,
+          "found_required": [
+            "corporation",
+            "công",
+            "kiện"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 316.9
+        },
+        {
+          "id": "ctx_online_general_007",
+          "preset": "General",
+          "source": "One antibody cocktail, ZMapp, initially showed promise in the field, but formal studies indicated it had less benefit than sought in preventing death.",
+          "reference": "Một hỗn hợp kháng thể, ZMapp, lúc đầu thể hiện những kết quả đầy hứa hẹn trong thực nghiệm, nhưng những nghiên cứu chính thức cho thấy nó mang lại lợi ích ít hơn mong đợi về mặt ngăn chặn tử vong.",
+          "hypothesis": "Thuốc kháng thể ZMapp, ban đầu cho thấy tiềm năng, nhưng các nghiên cứu chính thức cho thấy nó không hiệu quả bằng những gì dự kiến trong việc ngăn ngừa tử vong.",
+          "passed": true,
+          "required_coverage": 0.667,
+          "found_required": [
+            "nghiên",
+            "chính"
+          ],
+          "found_forbidden": [],
+          "latency_ms": 552.2
+        }
+      ]
+    }
+  },
+  "hardware": {
+    "translation": {
+      "device_requested": "cuda",
+      "device_actual": "cuda",
+      "gpu_offload": true,
+      "gpu_offload_supported": true,
+      "n_gpu_layers": -1,
+      "fallback_reason": "",
+      "llama_cpp_system_info": "CUDA : ARCHS = 1200 | USE_GRAPHS = 1 | FA_QUANTS = q4_0-q4_0,q8_0-q8_0,f16-f16,bf16-bf16 | BLACKWELL_NATIVE_FP4 = 1 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | "
+    }
+  }
+}

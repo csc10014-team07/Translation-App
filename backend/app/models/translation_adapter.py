@@ -45,6 +45,46 @@ class TranslationAdapter:
         self._llm = None
         self._ocr = None
         self._lock = threading.Lock()
+        self._actual_device = "unloaded"
+        self._n_gpu_layers = 0
+        self._gpu_offload_supported: bool | None = None
+        self._fallback_reason = ""
+        self._llama_system_info = ""
+
+    @staticmethod
+    def _supports_gpu_offload(llama_cpp_module) -> bool:
+        checker = getattr(llama_cpp_module, "llama_supports_gpu_offload", None)
+        if checker is None:
+            return False
+        try:
+            return bool(checker())
+        except Exception:
+            return False
+
+    @staticmethod
+    def _read_llama_system_info(llama_cpp_module) -> str:
+        get_info = getattr(llama_cpp_module, "llama_print_system_info", None)
+        if get_info is None:
+            return ""
+        try:
+            raw = get_info()
+            if isinstance(raw, bytes):
+                return raw.decode("utf-8", errors="replace")
+            return str(raw)
+        except Exception:
+            return ""
+
+    def backend_info(self) -> dict:
+        """Return the requested and actual llama.cpp backend configuration."""
+        return {
+            "device_requested": self.device,
+            "device_actual": self._actual_device,
+            "gpu_offload": self._actual_device == "cuda" and self._n_gpu_layers != 0,
+            "gpu_offload_supported": self._gpu_offload_supported,
+            "n_gpu_layers": self._n_gpu_layers,
+            "fallback_reason": self._fallback_reason,
+            "llama_cpp_system_info": self._llama_system_info,
+        }
 
     def _resolve_model_path(self) -> Path | None:
         candidates = [
@@ -59,31 +99,84 @@ class TranslationAdapter:
         return None
 
     def load(self) -> None:
-        """Load llama-cpp model if not already loaded."""
-        if self._llm is None and self.model_path and self.model_path.exists():
-            try:
-                from llama_cpp import Llama
-                n_gpu = settings.GEMMA_N_GPU_LAYERS if self.device.startswith("cuda") else 0
-                logger.info("Loading TranslateGemma GGUF: %s (n_gpu=%s)...", self.model_path, n_gpu)
-                try:
-                    self._llm = Llama(
-                        model_path=str(self.model_path),
-                        n_ctx=settings.GEMMA_N_CTX,
-                        n_gpu_layers=n_gpu,
-                        verbose=False,
-                    )
-                except Exception as e:
-                    logger.warning("GPU Llama load failed (%s). Falling back to CPU...", e)
-                    self._llm = Llama(
-                        model_path=str(self.model_path),
-                        n_ctx=min(settings.GEMMA_N_CTX, 2048),
-                        n_gpu_layers=0,
-                        verbose=False,
-                    )
-                logger.info("TranslateGemma loaded successfully.")
-            except Exception as exc:
-                logger.error("Failed to load llama-cpp-python: %s", exc)
+        """Load llama-cpp model if not already loaded, preferring GPU when available."""
+        if self._llm is not None:
+            return
+        if not self.model_path or not Path(self.model_path).exists():
+            self._actual_device = "unavailable"
+            self._fallback_reason = "model_not_found"
+            logger.error("TranslateGemma GGUF not found: %s", self.model_path)
+            return
+
+        try:
+            import llama_cpp
+            from llama_cpp import Llama
+        except Exception as exc:
+            self._actual_device = "unavailable"
+            self._fallback_reason = "llama_cpp_unavailable"
+            logger.error("Failed to load llama-cpp-python: %s", exc)
+            self._llm = None
+            return
+
+        self._gpu_offload_supported = self._supports_gpu_offload(llama_cpp)
+        self._llama_system_info = self._read_llama_system_info(llama_cpp)
+
+        requested_gpu = self.device.startswith("cuda")
+        n_gpu = int(settings.GEMMA_N_GPU_LAYERS) if requested_gpu else 0
+
+        if requested_gpu and n_gpu != 0 and not self._gpu_offload_supported:
+            self._fallback_reason = "llama_cpp_cpu_only"
+            logger.warning(
+                "TranslateGemma GPU offload requested, but this llama-cpp-python build "
+                "has no CUDA support. Running on CPU; install a CUDA-enabled build to use the GPU."
+            )
+            n_gpu = 0
+        elif requested_gpu and n_gpu == 0:
+            self._fallback_reason = "gpu_layers_disabled"
+            logger.warning("TranslateGemma GPU requested but GEMMA_N_GPU_LAYERS=0; running on CPU.")
+        elif not requested_gpu:
+            self._fallback_reason = "cpu_requested" if settings.DEVICE == "cpu" else "cuda_unavailable"
+
+        logger.info("Loading TranslateGemma GGUF: %s (n_gpu_layers=%s)...", self.model_path, n_gpu)
+        try:
+            self._llm = Llama(
+                model_path=str(self.model_path),
+                n_ctx=settings.GEMMA_N_CTX,
+                n_gpu_layers=n_gpu,
+                verbose=False,
+            )
+        except Exception as exc:
+            if n_gpu == 0:
+                self._actual_device = "unavailable"
+                self._fallback_reason = "model_load_failed"
+                logger.error("Failed to load TranslateGemma: %s", exc)
                 self._llm = None
+                return
+            logger.warning("GPU Llama load failed (%s). Falling back to CPU...", exc)
+            self._fallback_reason = "gpu_load_failed"
+            n_gpu = 0
+            try:
+                self._llm = Llama(
+                    model_path=str(self.model_path),
+                    n_ctx=min(settings.GEMMA_N_CTX, 2048),
+                    n_gpu_layers=0,
+                    verbose=False,
+                )
+            except Exception as cpu_exc:
+                self._actual_device = "unavailable"
+                self._fallback_reason = "model_load_failed"
+                logger.error("CPU fallback also failed: %s", cpu_exc)
+                self._llm = None
+                return
+
+        self._n_gpu_layers = n_gpu
+        self._actual_device = "cuda" if n_gpu != 0 else "cpu"
+        logger.info(
+            "TranslateGemma loaded on %s (n_gpu_layers=%s, offload_supported=%s).",
+            self._actual_device,
+            self._n_gpu_layers,
+            self._gpu_offload_supported,
+        )
 
     def build_prompt(
         self,
