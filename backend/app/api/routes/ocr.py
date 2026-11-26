@@ -85,6 +85,7 @@ async def ocr_image(
         ) from exc
 
     # ── 4. Stage 1: RapidOCR extraction on CPU ─────────────────────────────
+    ocr_started = time.monotonic()
     try:
         ocr = await manager.get_ocr()
         extracted_text, detected_lang, boxes = await asyncio.get_event_loop().run_in_executor(
@@ -102,6 +103,8 @@ async def ocr_image(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"OCR extraction failed: {exc}",
         ) from exc
+
+    ocr_ms = (time.monotonic() - ocr_started) * 1000
 
     # ── 5. Stage 2: Context-Aware Translation ──────────────────────────────
     resolved_target = (target_language or "").strip()
@@ -143,7 +146,7 @@ async def ocr_image(
         vietnamese_text = extracted_text or translated_text
 
     elapsed_ms = (time.monotonic() - t0) * 1000
-    vram_tracker.record_warm_inference("rapidocr", elapsed_ms)
+    vram_tracker.record_warm_inference("rapidocr", ocr_ms)
 
     return OCRResponse(
         extracted_text=extracted_text,

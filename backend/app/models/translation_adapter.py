@@ -36,6 +36,13 @@ LANGUAGE_NAMES = {
 }
 
 
+def _neutralize_turn_tokens(value: str) -> str:
+    """Prevent user text from creating extra Gemma chat turns."""
+    return value.replace("<start_of_turn>", "< start_of_turn >").replace(
+        "<end_of_turn>", "< end_of_turn >"
+    )
+
+
 class TranslationAdapter:
     """Context-aware translation adapter using TranslateGemma 4B GGUF."""
 
@@ -45,6 +52,7 @@ class TranslationAdapter:
         self._llm = None
         self._ocr = None
         self._lock = threading.Lock()
+        self._load_lock = threading.Lock()
         self._actual_device = "unloaded"
         self._n_gpu_layers = 0
         self._gpu_offload_supported: bool | None = None
@@ -99,7 +107,16 @@ class TranslationAdapter:
         return None
 
     def load(self) -> None:
-        """Load llama-cpp model if not already loaded, preferring GPU when available."""
+        """Load llama-cpp model once, even when called concurrently."""
+        if self._llm is not None:
+            return
+        with self._load_lock:
+            if self._llm is not None:
+                return
+            self._load_model()
+
+    def _load_model(self) -> None:
+        """Load the model; caller must hold ``_load_lock``."""
         if self._llm is not None:
             return
         if not self.model_path or not Path(self.model_path).exists():
@@ -187,8 +204,13 @@ class TranslationAdapter:
         context_preset: str = "",
         custom_context: str = "",
     ) -> str:
-        src_name = LANGUAGE_NAMES.get(source_lang.lower(), source_lang)
-        tgt_name = LANGUAGE_NAMES.get(target_lang.lower(), target_lang)
+        src_name = _neutralize_turn_tokens(
+            LANGUAGE_NAMES.get(source_lang.lower(), source_lang)
+        )
+        tgt_name = _neutralize_turn_tokens(
+            LANGUAGE_NAMES.get(target_lang.lower(), target_lang)
+        )
+        safe_text = _neutralize_turn_tokens(text)
 
         # Match preset if given
         preset_info = ""
@@ -213,13 +235,13 @@ class TranslationAdapter:
         if preset_info:
             parts.append(preset_info)
         if custom_context and custom_context.strip():
-            parts.append(custom_context.strip())
+            parts.append(_neutralize_turn_tokens(custom_context.strip()))
         if free_context:
-            parts.append(free_context)
+            parts.append(_neutralize_turn_tokens(free_context))
         if context and context.strip() and not preset_info:
             extra = context.strip()
             if extra not in free_context:
-                parts.append(extra)
+                parts.append(_neutralize_turn_tokens(extra))
 
         combined_context = " | ".join(parts).strip()
         if not combined_context:
@@ -231,7 +253,7 @@ class TranslationAdapter:
             f"Your goal is to accurately convey the meaning and nuances of the original text while adhering to {tgt_name} grammar, vocabulary, and cultural sensitivities.\n"
             f"Context requirement: {combined_context}.\n"
             f"Produce only the {tgt_name} translation, without any additional explanations or commentary.\n\n"
-            f"{text}<end_of_turn>\n"
+            f"{safe_text}<end_of_turn>\n"
             f"<start_of_turn>model\n"
         )
 
