@@ -58,6 +58,12 @@ export const VOICE_LIVE_MAX_DURATION_S = 30;
  */
 export const VOICE_WARNING_REMAINING_S = 5;
 
+/** Thời lượng tối thiểu để Pocket TTS nhân bản giọng (giây). */
+export const VOICE_CLONE_MIN_DURATION_S = 3;
+
+/** Thời lượng tối đa của giọng mẫu; backend truncate nếu dài hơn (giây). */
+export const VOICE_CLONE_MAX_DURATION_S = 30;
+
 /**
  * Thời gian chờ sự kiện cuối từ backend sau khi app dừng ghi (ms).
  *

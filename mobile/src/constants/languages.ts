@@ -66,6 +66,8 @@ export interface Language {
   supportsOcr: boolean;
   /** Có ĐỌC TO được không (Edge-TTS). */
   supportsTts: boolean;
+  /** Có nhân bản giọng bằng Pocket TTS được không. */
+  supportsVoiceCloning: boolean;
 }
 
 /** Thứ tự khai báo catalog (nhóm theo mức hỗ trợ, không phải thứ tự hiển thị). */
@@ -79,6 +81,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: true,
     supportsOcr: true,
     supportsTts: true,
+    supportsVoiceCloning: false,
   },
   {
     code: 'en',
@@ -89,6 +92,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: true,
     supportsTts: true,
+    supportsVoiceCloning: true,
   },
   {
     code: 'zh',
@@ -99,6 +103,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: true,
     supportsTts: true,
+    supportsVoiceCloning: false,
   },
   {
     code: 'ja',
@@ -109,6 +114,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: true,
     supportsTts: true,
+    supportsVoiceCloning: false,
   },
   {
     code: 'ko',
@@ -119,6 +125,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: false,
     supportsTts: true,
+    supportsVoiceCloning: false,
   },
   {
     code: 'fr',
@@ -129,6 +136,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: false,
     supportsTts: true,
+    supportsVoiceCloning: true,
   },
   {
     code: 'de',
@@ -139,6 +147,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: false,
     supportsTts: true,
+    supportsVoiceCloning: true,
   },
   {
     code: 'es',
@@ -149,6 +158,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: false,
     supportsTts: true,
+    supportsVoiceCloning: true,
   },
   {
     code: 'pt',
@@ -159,6 +169,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: false,
     supportsTts: true,
+    supportsVoiceCloning: true,
   },
   {
     code: 'ru',
@@ -169,6 +180,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: false,
     supportsTts: true,
+    supportsVoiceCloning: false,
   },
   {
     code: 'it',
@@ -179,6 +191,7 @@ export const LANGUAGE_CATALOG = [
     supportsVoiceInput: false,
     supportsOcr: false,
     supportsTts: true,
+    supportsVoiceCloning: true,
   },
 ] as const satisfies readonly Language[];
 
@@ -280,6 +293,11 @@ export function supportsOcr(code: string): boolean {
 /** Mã này có đọc to được không (Edge-TTS). */
 export function supportsTts(code: string): boolean {
   return getLanguage(code)?.supportsTts ?? false;
+}
+
+/** Mã này có nhân bản giọng bằng Pocket TTS được không. */
+export function supportsVoiceCloning(code: string): boolean {
+  return getLanguage(code)?.supportsVoiceCloning ?? false;
 }
 
 // ──────────────────────────────────────────────

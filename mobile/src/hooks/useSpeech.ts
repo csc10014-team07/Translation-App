@@ -22,6 +22,7 @@ export type SpeechStatus = 'idle' | 'loading' | 'playing' | 'error';
 interface UseSpeechResult {
   status: SpeechStatus;
   ttsError: string | null;
+  ttsNote: string | null;
   play: () => Promise<void>;
   stop: () => Promise<void>;
 }
@@ -30,19 +31,24 @@ interface UseSpeechResult {
  * @param text           — bản dịch cần đọc
  * @param language       — mã ngôn ngữ đích (e.g. 'en', 'ja')
  * @param enabled        — true khi phase === 'result'; false thì không làm gì
+ * @param referenceAudioUri — giọng mẫu trong phiên; null = giọng mặc định
  */
 export function useSpeech(
   text: string,
   language: string,
   enabled: boolean,
+  referenceAudioUri: string | null = null,
 ): UseSpeechResult {
   const [status, setStatus] = useState<SpeechStatus>('idle');
   const [ttsError, setTtsError] = useState<string | null>(null);
+  const [ttsNote, setTtsNote] = useState<string | null>(null);
 
   // Sound instance hiện tại
   const soundRef = useRef<Audio.Sound | null>(null);
-  // Cache: key = text + '|' + language → uri file âm thanh
-  const cacheRef = useRef<Map<string, string>>(new Map());
+  // Cache: key = text + language + reference → uri + note
+  const cacheRef = useRef<Map<string, { uri: string; note: string | null }>>(
+    new Map(),
+  );
   // Theo dõi key của lần fetch gần nhất để tránh race condition
   const fetchKeyRef = useRef<string>('');
 
@@ -64,8 +70,9 @@ export function useSpeech(
     // Reset về idle mỗi khi đầu vào thay đổi hoặc widget bị ẩn
     setStatus('idle');
     setTtsError(null);
+    setTtsNote(null);
     void unloadSound();
-  }, [text, language, enabled, unloadSound]);
+  }, [text, language, enabled, referenceAudioUri, unloadSound]);
 
   // Dọn khi unmount
   useEffect(() => {
@@ -124,40 +131,65 @@ export function useSpeech(
 
     setStatus('loading');
     setTtsError(null);
+    setTtsNote(null);
 
-    const cacheKey = `${text}|${language}`;
+    const cacheKey = `${text}|${language}|${referenceAudioUri ?? 'default'}`;
     fetchKeyRef.current = cacheKey;
 
     try {
       // Lấy URI từ cache hoặc gọi API
-      let uri = cacheRef.current.get(cacheKey);
+      let cached = cacheRef.current.get(cacheKey);
 
-      if (!uri) {
-        // Gọi TTS — giọng mặc định (không truyền referenceAudioUri)
-        const ttsResponse = await synthesizeSpeech(text, language);
-        // Race condition: người dùng đổi bản dịch khi đang fetch
+      if (!cached) {
+        const ttsResponse = await synthesizeSpeech(
+          text,
+          language,
+          referenceAudioUri ?? undefined,
+        );
+        // Race condition: người dùng đổi bản dịch/giọng khi đang fetch
         if (fetchKeyRef.current !== cacheKey) return;
 
-        uri = await saveBase64Audio(ttsResponse.audio_base64, ttsResponse.format);
+        const uri = await saveBase64Audio(
+          ttsResponse.audio_base64,
+          ttsResponse.format,
+        );
         if (fetchKeyRef.current !== cacheKey) return;
-        cacheRef.current.set(cacheKey, uri);
+
+        let note: string | null = null;
+        if (ttsResponse.reference_used) {
+          note = ttsResponse.voice_cloned
+            ? strings.home.voiceClonedNote
+            : strings.home.voiceCloneFallbackNote;
+        }
+        cached = { uri, note };
+        cacheRef.current.set(cacheKey, cached);
       }
 
       // Dọn Sound cũ (nếu có)
       await unloadSound();
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri },
+        { uri: cached.uri },
         { shouldPlay: true },
         handlePlaybackStatus,
       );
       soundRef.current = sound;
+      setTtsNote(cached.note);
       setStatus('playing');
     } catch {
       setStatus('error');
       setTtsError('Không đọc được. Thử lại.');
     }
-  }, [enabled, status, text, language, stop, unloadSound, handlePlaybackStatus]);
+  }, [
+    enabled,
+    status,
+    text,
+    language,
+    referenceAudioUri,
+    stop,
+    unloadSound,
+    handlePlaybackStatus,
+  ]);
 
-  return { status, ttsError, play, stop };
+  return { status, ttsError, ttsNote, play, stop };
 }

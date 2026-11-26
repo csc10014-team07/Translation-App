@@ -47,6 +47,32 @@ export const strings = {
     copied: 'Đã sao chép',
     // Nhãn tóm tắt khi chỉ có ghi chú ngữ cảnh (không chọn giọng văn nào).
     contextNoteFallback: 'ghi chú',
+    voiceSample: 'Giọng mẫu',
+    voiceSampleActive: 'Đang dùng giọng mẫu',
+    voiceClonedNote: 'Đã dùng giọng mẫu',
+    voiceCloneFallbackNote: 'Không dùng được giọng mẫu, đã dùng giọng mặc định',
+  },
+
+  voiceClone: {
+    title: 'Giọng mẫu',
+    description: 'Ghi 3–30 giây giọng của bạn để đọc bản dịch bằng giọng này.',
+    record: 'Bắt đầu ghi',
+    stop: 'Dừng ghi',
+    play: 'Nghe lại',
+    stopPlay: 'Dừng nghe',
+    use: 'Dùng giọng này',
+    clear: 'Xoá giọng mẫu',
+    close: 'Đóng',
+    ready: 'Giọng mẫu đã sẵn sàng',
+    recordingHint: 'Đang ghi… hãy nói tự nhiên.',
+    tooShort: 'Giọng mẫu quá ngắn. Hãy ghi ít nhất 3 giây.',
+    permissionDenied: 'Cần quyền micro để ghi giọng mẫu.',
+    recordError: 'Không ghi được giọng mẫu. Vui lòng thử lại.',
+    accessibilityRecord: 'Ghi giọng mẫu',
+    accessibilityStop: 'Dừng ghi giọng mẫu',
+    accessibilityPlay: 'Nghe lại giọng mẫu',
+    accessibilityUse: 'Dùng giọng mẫu này',
+    accessibilityClear: 'Xoá giọng mẫu',
   },
 
   context: {

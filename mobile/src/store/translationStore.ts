@@ -76,7 +76,7 @@ export interface TranslationState {
   processImage: (imageUri: string) => Promise<void>;
   runOcrOnly: (imageUri: string) => Promise<string>;
   translate: () => Promise<void>;
-  setReferenceAudio: (uri: string) => void;
+  setReferenceAudio: (uri: string | null) => void;
   synthesize: () => Promise<void>;
   startStreaming: (customUrl?: string) => Promise<void>;
   stopStreaming: () => void;
@@ -247,7 +247,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
     }
   },
 
-  setReferenceAudio: (uri: string) => set({ referenceAudioUri: uri }),
+  setReferenceAudio: (uri: string | null) => set({ referenceAudioUri: uri }),
 
   synthesize: async () => {
     const {

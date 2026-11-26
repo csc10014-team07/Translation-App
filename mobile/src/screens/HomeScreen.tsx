@@ -24,6 +24,7 @@ import LanguageTile from '../components/LanguageTile';
 import ToneChip from '../components/ToneChip';
 import PrimaryButton from '../components/PrimaryButton';
 import ErrorCard from '../components/ErrorCard';
+import VoiceCloneSheet from '../components/VoiceCloneSheet';
 import { strings } from '../constants/strings';
 import {
   getSourceFullLabel,
@@ -31,6 +32,7 @@ import {
   getTargetLabel,
   supportsOcr,
   supportsTts,
+  supportsVoiceCloning,
   supportsVoiceInput,
 } from '../constants/languages';
 import { INPUT_MAX_LENGTH } from '../constants/limits';
@@ -81,6 +83,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   // ── Trạng thái copy ──
   const [copied, setCopied] = useState(false);
+  const [voiceSheetOpen, setVoiceSheetOpen] = useState(false);
+  const referenceAudioUri = useTranslationStore((st) => st.referenceAudioUri);
+  const setReferenceAudio = useTranslationStore((st) => st.setReferenceAudio);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Dòng thông báo nhỏ dưới ô nhập (ví dụ: nguồn không hỗ trợ mic/quét chữ) ──
@@ -134,10 +139,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   // ── TTS (đọc to) ──
   const translatedText = useTranslationStore((st) => st.translatedText);
   const translateError = useTranslationStore((st) => st.translateError);
-  const { status: speechStatus, ttsError, play: playSpeech } = useSpeech(
+  const voiceCloningSupported = supportsVoiceCloning(targetLanguage);
+  const activeReferenceUri = voiceCloningSupported ? referenceAudioUri : null;
+  const { status: speechStatus, ttsError, ttsNote, play: playSpeech } = useSpeech(
     translatedText,
     targetLanguage,
     phase === 'result',
+    activeReferenceUri,
   );
 
   const inputRef = useRef<TextInput>(null);
@@ -434,6 +442,22 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                       <View style={{ width: s(12) }} />
                     </>
                   )}
+                  {voiceCloningSupported && (
+                    <>
+                      <IconCircleButton
+                        icon={referenceAudioUri ? 'mic-circle' : 'mic-outline'}
+                        size="medium"
+                        variant={referenceAudioUri ? 'soft' : 'neutral'}
+                        accessibilityLabel={
+                          referenceAudioUri
+                            ? strings.home.voiceSampleActive
+                            : strings.home.voiceSample
+                        }
+                        onPress={() => setVoiceSheetOpen(true)}
+                      />
+                      <View style={{ width: s(12) }} />
+                    </>
+                  )}
                   <IconCircleButton
                     icon={copied ? 'checkmark' : 'copy-outline'}
                     size="medium"
@@ -460,6 +484,24 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     style={[styles.ttsError, { color: colors.danger, marginTop: vs(8) }]}
                   >
                     {ttsError}
+                  </ThemedText>
+                )}
+
+                {/* Ghi chú giọng mẫu */}
+                {ttsNote !== null && (
+                  <ThemedText
+                    style={[styles.ttsNote, { color: colors.textSecondary, marginTop: vs(8) }]}
+                  >
+                    {ttsNote}
+                  </ThemedText>
+                )}
+
+                {/* Trạng thái có giọng mẫu */}
+                {voiceCloningSupported && referenceAudioUri !== null && (
+                  <ThemedText
+                    style={[styles.ttsNote, { color: colors.textSecondary, marginTop: vs(6) }]}
+                  >
+                    {strings.home.voiceSampleActive}
                   </ThemedText>
                 )}
               </View>
@@ -618,6 +660,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           </View>
         )}
       </View>
+
+      <VoiceCloneSheet
+        visible={voiceSheetOpen}
+        initialUri={referenceAudioUri}
+        onClose={() => setVoiceSheetOpen(false)}
+        onUse={(uri) => setReferenceAudio(uri)}
+        onClear={() => setReferenceAudio(null)}
+      />
     </KeyboardAvoidingView>
   );
 }

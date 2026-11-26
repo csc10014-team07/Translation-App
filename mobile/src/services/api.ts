@@ -54,6 +54,11 @@ export interface TTSResponse {
   audio_base64: string;
   sample_rate: number;
   format: string;
+  engine?: string;
+  voice_note?: string | null;
+  voice_cloned?: boolean;
+  reference_used?: boolean;
+  elapsed_ms?: number;
 }
 
 export interface HealthResponse {
