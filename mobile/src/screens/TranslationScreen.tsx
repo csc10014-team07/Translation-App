@@ -289,7 +289,7 @@ export default function TranslationScreen() {
       {/* ── Voice Cloning Panel ── */}
       <VoiceCloningPanel
         translatedText={translatedText}
-        translatedLanguage={translatedLanguage}
+        targetLanguage={translatedLanguage || targetLanguage}
         isSynthesizing={isSynthesizing}
         synthesizedAudioUri={synthesizedAudioUri}
         onRecordReference={setReferenceAudio}

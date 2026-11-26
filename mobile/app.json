@@ -18,10 +18,15 @@
       "supportsTablet": false
     },
     "android": {
+      "package": "com.csc10014team07.translationapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "plugins": [
       [
@@ -38,6 +43,12 @@
         }
       ],
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c581b7dd-9112-4374-8ffb-a38e2d813101"
+      }
+    },
+    "owner": "kahgn"
   }
 }

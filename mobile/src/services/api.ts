@@ -109,33 +109,6 @@ function appendFileToForm(
   } as unknown as Blob);
 }
 
-function getAudioFileInfo(
-  uri: string,
-  fallbackName: string,
-): { fileName: string; mimeType: string } {
-  const rawName = uri.split('/').pop()?.split('?')[0] ?? fallbackName;
-  const dotIndex = rawName.lastIndexOf('.');
-  const ext = dotIndex !== -1 ? rawName.slice(dotIndex + 1).toLowerCase() : 'm4a';
-  const fileName = dotIndex !== -1 ? rawName : `${rawName}.${ext}`;
-
-  let mimeType = 'application/octet-stream';
-  if (ext === 'm4a' || ext === 'mp4') {
-    mimeType = 'audio/mp4';
-  } else if (ext === 'wav') {
-    mimeType = 'audio/wav';
-  } else if (ext === 'mp3') {
-    mimeType = 'audio/mpeg';
-  } else if (ext === 'flac') {
-    mimeType = 'audio/flac';
-  } else if (ext === 'ogg') {
-    mimeType = 'audio/ogg';
-  } else if (ext === 'webm') {
-    mimeType = 'audio/webm';
-  }
-
-  return { fileName, mimeType };
-}
-
 // ──────────────────────────────────────────────
 // API functions
 // ──────────────────────────────────────────────

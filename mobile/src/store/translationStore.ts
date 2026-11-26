@@ -29,6 +29,7 @@ export interface TranslationState {
 
   // ── Output ──
   translatedText: string;
+  translatedLanguage: string;
   sourceLanguage: string;
 
   // ── Voice cloning ──
@@ -68,6 +69,8 @@ export interface TranslationState {
 let activeStreamClient: StreamClient | null = null;
 let streamSessionId = 0;
 
+const LIVE_STREAM_VOICE_CLONING_ENABLED = false;
+
 const initialState = {
   inputMode: 'text' as InputMode,
   inputLanguage: 'vi',
@@ -75,6 +78,7 @@ const initialState = {
   context: '',
   targetLanguage: 'en',
   translatedText: '',
+  translatedLanguage: '',
   sourceLanguage: '',
   referenceAudioUri: null as string | null,
   synthesizedAudioUri: null as string | null,
@@ -144,6 +148,8 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       set((state) => ({
         vietnameseText: result.vietnamese_text,
         translatedText: result.translated_text || state.translatedText,
+        translatedLanguage:
+          result.target_language || state.translatedLanguage,
         inputLanguage: result.detected_language || state.inputLanguage,
       }));
     } catch (e: unknown) {
@@ -169,6 +175,7 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       );
       set({
         translatedText: result.translated_text,
+        translatedLanguage: result.target_language,
         sourceLanguage: result.source_language,
       });
     } catch (e: unknown) {
@@ -229,13 +236,18 @@ export const useTranslationStore = create<TranslationState>((set, get) => ({
       activeStreamClient.disconnect();
       activeStreamClient = null;
     }
-    set({ isStreaming: true, error: null, translatedText: '' });
+    set({
+      isStreaming: true,
+      error: null,
+      translatedText: '',
+      translatedLanguage: targetLanguage || 'en',
+    });
 
     const client = new StreamClient({
       sourceLang: inputLanguage,
       targetLang: targetLanguage || 'en',
       customContext: context || '',
-      cloneVoice: !!referenceAudioUri,
+      cloneVoice: LIVE_STREAM_VOICE_CLONING_ENABLED && !!referenceAudioUri,
       onAsrInterim: (text) => {
         if (sessionId === streamSessionId) set({ vietnameseText: text });
       },
