@@ -42,6 +42,14 @@
           "cameraPermission": "Allow access to camera for OCR."
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow translation app to access camera for OCR.",
+          "microphonePermission": "Allow translation app to access microphone.",
+          "recordAudioAndroid": true
+        }
+      ],
       "expo-font"
     ],
     "extra": {

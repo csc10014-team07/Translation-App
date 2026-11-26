@@ -1,3 +1,4 @@
+// Deprecated: thay bởi giao diện V2 (HomeScreen/TargetLanguageScreen/...). Giữ để tham khảo.
 import React, { useState } from 'react';
 import {
   View,
@@ -17,7 +18,7 @@ interface Props {
   onSelect: (code: string) => void;
   label?: string;
   title?: string;
-  languages?: readonly { code: string; name: string }[];
+  languages?: readonly { code: string; name?: string; label?: string; shortLabel?: string }[];
 }
 
 const PRIMARY = '#4F46E5';
@@ -47,7 +48,7 @@ export default function LanguagePicker({
         style={[styles.trigger, isDark && styles.triggerDark]}
         onPress={() => setVisible(true)}
         activeOpacity={0.8}
-        accessibilityLabel={`${label}: ${selectedLang.name}. Tap to change.`}
+        accessibilityLabel={`${label}: ${selectedLang.label ?? selectedLang.name ?? selectedLang.code}. Tap to change.`}
         accessibilityRole="button"
       >
         <View style={styles.triggerLeft}>
@@ -57,7 +58,7 @@ export default function LanguagePicker({
           </Text>
         </View>
         <View style={styles.triggerRight}>
-          <Text style={styles.selectedName}>{selectedLang.name}</Text>
+          <Text style={styles.selectedName}>{selectedLang.label ?? selectedLang.name ?? selectedLang.code}</Text>
           <Ionicons name="chevron-down" size={16} color={PRIMARY} />
         </View>
       </TouchableOpacity>
@@ -103,7 +104,7 @@ export default function LanguagePicker({
                       isDark && styles.textDark,
                     ]}
                   >
-                    {item.name}
+                    {item.label ?? item.name ?? item.code}
                   </Text>
                   {active && (
                     <Ionicons name="checkmark" size={20} color={PRIMARY} />

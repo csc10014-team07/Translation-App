@@ -1,3 +1,4 @@
+// Deprecated: thay bởi giao diện V2 (HomeScreen/TargetLanguageScreen/...). Giữ để tham khảo.
 import React, { useCallback } from 'react';
 import {
   View,

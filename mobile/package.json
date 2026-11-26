@@ -10,13 +10,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
     "@expo/vector-icons": "^14.0.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.17",
+    "@react-navigation/native-stack": "^6.11.0",
     "@react-navigation/stack": "^6.3.29",
     "axios": "^1.7.0",
     "expo": "~51.0.0",
     "expo-av": "~14.0.7",
+    "expo-camera": "~15.0.16",
+    "expo-clipboard": "~6.0.3",
     "expo-file-system": "~17.0.1",
     "expo-font": "~12.0.10",
     "expo-image-picker": "~15.1.0",

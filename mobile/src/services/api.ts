@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { API_BASE_URL, WS_BASE_URL } from '../config/api';
+import { DEFAULT_SOURCE_CODE } from '../constants/languages';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -114,12 +115,17 @@ function appendFileToForm(
 // ──────────────────────────────────────────────
 
 /**
- * POST /api/asr — send an audio file and get back Vietnamese text.
+ * POST /api/asr — send an audio file and get back recognized text.
+ * `sourceLanguage` (mã ISO) cho biết nguồn hiện tại; backend có thể bỏ qua.
  */
-export async function transcribeAudio(audioUri: string): Promise<ASRResponse> {
+export async function transcribeAudio(
+  audioUri: string,
+  sourceLanguage?: string,
+): Promise<ASRResponse> {
   const form = new FormData();
   const { fileName, mimeType } = getAudioFileInfo(audioUri, 'recording.m4a');
   appendFileToForm(form, 'audio', audioUri, mimeType, fileName);
+  if (sourceLanguage) form.append('source_language', sourceLanguage);
 
   const response = await apiClient.post<ASRResponse>('/api/asr', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -158,7 +164,7 @@ export async function ocrImage(
 export async function translateText(
   text: string,
   targetLanguage: string,
-  sourceLanguage = 'vi',
+  sourceLanguage: string = DEFAULT_SOURCE_CODE,
   context?: string,
   contextPreset?: string,
   customContext?: string,
