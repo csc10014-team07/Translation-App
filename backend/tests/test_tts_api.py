@@ -4,6 +4,8 @@ import io
 import sys
 from pathlib import Path
 
+import av
+
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
@@ -23,15 +25,36 @@ def client():
     return TestClient(app)
 
 
-def _create_sample_wav(duration_s: float = 2.0, sr: int = 16000) -> bytes:
+def _create_sample_wav(duration_s: float = 3.5, sr: int = 16000) -> bytes:
     """Generate a valid in-memory PCM WAV audio file for testing."""
     t = np.linspace(0, duration_s, int(sr * duration_s), endpoint=False)
-    # Generate a simple harmonic signal mimicking human speech range (220 Hz fundamental)
     signal = 0.5 * np.sin(2 * np.pi * 220 * t) + 0.25 * np.sin(2 * np.pi * 440 * t)
     buf = io.BytesIO()
     sf.write(buf, signal.astype(np.float32), sr, format="WAV", subtype="PCM_16")
     buf.seek(0)
     return buf.read()
+
+
+def _create_sample_m4a(duration_s: float = 3.5, sr: int = 16000) -> bytes:
+    """Generate an AAC-in-MP4 payload matching what Expo AV records on Android."""
+    t = np.linspace(0, duration_s, int(sr * duration_s), endpoint=False)
+    signal = (0.4 * np.sin(2 * np.pi * 220 * t) * 32767).astype(np.int16)
+    buf = io.BytesIO()
+    with av.open(buf, mode="w", format="mp4") as container:
+        stream = container.add_stream("aac", rate=sr)
+        stream.layout = "mono"
+        stream.bit_rate = 64_000
+        frame = av.AudioFrame.from_ndarray(
+            signal.reshape(1, -1),
+            format="s16",
+            layout="mono",
+        )
+        frame.sample_rate = sr
+        for packet in stream.encode(frame):
+            container.mux(packet)
+        for packet in stream.encode(None):
+            container.mux(packet)
+    return buf.getvalue()
 
 
 def test_english_tts_form(client):
@@ -80,7 +103,7 @@ def test_vietnamese_tts_edge(client):
 
 def test_voice_cloning_with_reference_audio(client):
     """Test zero-shot cross-lingual voice cloning using Pocket TTS on CPU when reference audio is provided."""
-    wav_bytes = _create_sample_wav(duration_s=2.5, sr=16000)
+    wav_bytes = _create_sample_wav(duration_s=3.5, sr=16000)
 
     files = {
         "reference_audio": ("speaker_sample.wav", wav_bytes, "audio/wav"),
@@ -97,12 +120,95 @@ def test_voice_cloning_with_reference_audio(client):
     assert data["engine"] == "pocket_tts"
     assert data["format"] == "wav"
     assert data["sample_rate"] == 24000
+    assert data["reference_used"] is True
+    assert data["voice_cloned"] is True
+    assert data["voice_note"] == "voice cloned from reference audio"
 
     audio_bytes = base64.b64decode(data["audio_base64"])
     audio_arr, sr = sf.read(io.BytesIO(audio_bytes))
     dur = len(audio_arr) / sr
     assert dur > 0.5, f"Synthesized audio duration should be > 0.5s, got {dur:.2f}s"
     print(f"✅ Voice cloning TTS output generated: {dur:.2f}s audio ({data['engine']})")
+
+
+def test_voice_cloning_accepts_m4a_from_mobile(client):
+    """Expo AV records M4A; the backend must normalize it before Pocket TTS."""
+    m4a_bytes = _create_sample_m4a(duration_s=3.5, sr=16000)
+
+    files = {
+        "reference_audio": ("reference.m4a", m4a_bytes, "audio/mp4"),
+    }
+    form_data = {
+        "text": "Testing an M4A reference recording from the mobile app.",
+        "language": "English",
+    }
+
+    resp = client.post("/api/tts", data=form_data, files=files)
+    assert resp.status_code == 200, f"Error {resp.status_code}: {resp.text}"
+    data = resp.json()
+    assert data["engine"] == "pocket_tts"
+    assert data["reference_used"] is True
+    assert data["voice_cloned"] is True
+
+
+def test_reference_audio_too_short_is_rejected(client):
+    """Cloning a voice from <3 seconds is not reliable; reject clearly."""
+    wav_bytes = _create_sample_wav(duration_s=1.0, sr=16000)
+    files = {"reference_audio": ("short.wav", wav_bytes, "audio/wav")}
+    resp = client.post(
+        "/api/tts",
+        data={"text": "hello", "language": "English"},
+        files=files,
+    )
+    assert resp.status_code == 422
+    assert "too short" in resp.json()["detail"].lower()
+
+
+def test_reference_audio_long_is_truncated(client):
+    """Long reference audio is truncated to the 30s cap instead of rejected."""
+    wav_bytes = _create_sample_wav(duration_s=35.0, sr=16000)
+    files = {"reference_audio": ("long.wav", wav_bytes, "audio/wav")}
+    resp = client.post(
+        "/api/tts",
+        data={"text": "hello", "language": "English"},
+        files=files,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["reference_used"] is True
+
+
+def test_reference_audio_silent_is_rejected(client):
+    """Silent recordings cannot condition a voice and must fail clearly."""
+    silence = np.zeros(56_000, dtype=np.int16)
+    buf = io.BytesIO()
+    sf.write(buf, silence, 16_000, format="WAV", subtype="PCM_16")
+    files = {
+        "reference_audio": ("silence.wav", buf.getvalue(), "audio/wav"),
+    }
+    resp = client.post(
+        "/api/tts",
+        data={"text": "hello", "language": "English"},
+        files=files,
+    )
+    assert resp.status_code == 422
+    assert "silent" in resp.json()["detail"].lower()
+
+
+def test_reference_audio_ignored_for_edge_language(client):
+    """Edge-TTS languages accept the request but do not clone or use the sample."""
+    wav_bytes = _create_sample_wav(duration_s=3.5, sr=16000)
+    files = {"reference_audio": ("sample.wav", wav_bytes, "audio/wav")}
+    resp = client.post(
+        "/api/tts",
+        data={"text": "Xin chào", "language": "Vietnamese"},
+        files=files,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["engine"] == "edge_tts"
+    assert data["reference_used"] is False
+    assert data["voice_cloned"] is False
 
 
 def test_tts_json_payload(client):

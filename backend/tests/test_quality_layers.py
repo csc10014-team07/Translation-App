@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import app.api.routes.ocr as ocr_route
 import numpy as np
 import pytest
+import soundfile as sf
 from app.api.deps import dep_model_manager
 from app.core import vram_monitor
 from app.core.vram_monitor import (
@@ -82,6 +83,14 @@ def _png_bytes() -> bytes:
     return buf.getvalue()
 
 
+def _wav_bytes(duration_s: float = 3.5, sample_rate: int = 16000) -> bytes:
+    t = np.linspace(0, duration_s, int(sample_rate * duration_s), endpoint=False)
+    signal = (0.3 * np.sin(2 * np.pi * 220 * t) * 32767).astype(np.int16)
+    buf = io.BytesIO()
+    sf.write(buf, signal, sample_rate, format="WAV", subtype="PCM_16")
+    return buf.getvalue()
+
+
 @pytest.mark.integration
 def test_bug_01_tts_reference_audio_is_persisted(monkeypatch):
     """BUG-01: uploaded reference audio must reach the TTS adapter unmangled."""
@@ -98,11 +107,13 @@ def test_bug_01_tts_reference_audio_is_persisted(monkeypatch):
         path = Path(reference_audio_path)
         captured["path"] = path
         captured["exists"] = path.exists()
-        captured["bytes"] = path.read_bytes()
+        normalized, sample_rate = sf.read(str(path), dtype="float32")
+        captured["sample_rate"] = sample_rate
+        captured["duration_s"] = len(normalized) / sample_rate
         return TTSResult(np.zeros(1600, dtype=np.float32), 16000, engine="pocket_tts")
 
     monkeypatch.setattr(TTSAdapter, "synthesize", fake_synthesize)
-    payload = b"RIFF-reference-audio-payload"
+    payload = _wav_bytes()
 
     response = TestClient(app).post(
         "/api/tts",
@@ -112,7 +123,11 @@ def test_bug_01_tts_reference_audio_is_persisted(monkeypatch):
 
     assert response.status_code == 200, response.text
     assert captured["exists"] is True
-    assert captured["bytes"] == payload
+    path = captured["path"]
+    assert isinstance(path, Path)
+    assert path.suffix == ".wav"
+    assert captured["sample_rate"] == 24_000
+    assert captured["duration_s"] >= 3.0
 
 
 @pytest.mark.stress
