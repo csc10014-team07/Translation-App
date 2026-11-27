@@ -34,4 +34,7 @@ markers = [
     "slow: marks tests as slow or requiring full model loading (deselect with '-m \"not slow\"')",
     "integration: integration tests against API endpoints or simulated connections",
     "unit: fast in-memory unit tests",
+    "stress: concurrency, resource, and volume tests",
+    "security: injection, traversal, and authentication tests",
+    "profiling: latency and cProfile measurements",
 ]

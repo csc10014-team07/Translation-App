@@ -8,6 +8,9 @@ import torch
 
 logger = logging.getLogger(__name__)
 
+_MAX_SAMPLES_PER_MODEL = 1000
+_MAX_VRAM_SNAPSHOTS = 20
+
 
 def get_vram_info() -> dict[str, float]:
     """
@@ -58,12 +61,16 @@ class VRAMTracker:
 
     def record_cold_start(self, model_name: str, latency_ms: float) -> None:
         """Record a cold-start (model load) latency measurement."""
-        self._cold_starts[model_name].append(latency_ms)
+        samples = self._cold_starts[model_name]
+        samples.append(latency_ms)
+        del samples[:-_MAX_SAMPLES_PER_MODEL]
         logger.debug("Cold-start recorded: model=%s latency=%.1f ms", model_name, latency_ms)
 
     def record_warm_inference(self, model_name: str, latency_ms: float) -> None:
         """Record a warm-inference (model already in VRAM) latency measurement."""
-        self._warm_inferences[model_name].append(latency_ms)
+        samples = self._warm_inferences[model_name]
+        samples.append(latency_ms)
+        del samples[:-_MAX_SAMPLES_PER_MODEL]
         logger.debug("Warm inference recorded: model=%s latency=%.1f ms", model_name, latency_ms)
 
     def snapshot_vram(self, label: str = "") -> None:
@@ -72,6 +79,7 @@ class VRAMTracker:
         snap["label"] = label
         snap["ts"] = time.time()
         self._vram_snapshots.append(snap)
+        del self._vram_snapshots[:-_MAX_VRAM_SNAPSHOTS]
 
     # ── Aggregation ────────────────────────────────────────────────────────
 

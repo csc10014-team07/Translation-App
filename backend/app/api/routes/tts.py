@@ -8,23 +8,25 @@ import tempfile
 import time
 from pathlib import Path
 
-import aiofiles
 import numpy as np
 import soundfile as sf
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, status
 from pydantic import ValidationError
 
 from app.api.deps import dep_model_manager
+from app.core.audio_ref import normalize_reference_audio
 from app.core.vram_monitor import vram_tracker
 from app.models.manager import ModelManager
+from app.models.tts_adapter import POCKET_TTS_LANG_MAP
 from app.schemas.tts import TTSRequest, TTSResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["TTS"])
 
 _VIETNAMESE_LANG_CODES = {"vi", "vietnamese", "vie"}
-_SUPPORTED_REF_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+_SUPPORTED_REF_AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".mp4", ".webm"}
 _MAX_REF_AUDIO_BYTES = 20 * 1024 * 1024  # 20 MB
+_REF_AUDIO_CHUNK_BYTES = 65_536
 
 
 def _is_vietnamese(language: str) -> bool:
@@ -101,21 +103,31 @@ async def synthesise_speech(
             detail="Field 'language' or 'target_language' must be specified.",
         )
 
+    upload_path: str | None = None
     ref_audio_path: str | None = None
+    cloning_supported = (
+        effective_language.strip().lower() in POCKET_TTS_LANG_MAP
+    )
 
     try:
-        # ── Save reference audio if provided ───────────────────────────────
-        if reference_audio is not None and reference_audio.filename:
+        # ── Save reference audio if cloning is supported ───────────────────
+        if (
+            cloning_supported
+            and reference_audio is not None
+            and reference_audio.filename
+        ):
             ref_suffix = Path(reference_audio.filename).suffix.lower()
             if ref_suffix not in _SUPPORTED_REF_AUDIO_EXTENSIONS:
                 raise HTTPException(
                     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                    detail=f"Unsupported reference audio format '{ref_suffix}'. Allowed formats: {_SUPPORTED_REF_AUDIO_EXTENSIONS}",
+                    detail=(
+                        f"Unsupported reference audio format '{ref_suffix}'. "
+                        f"Allowed formats: {sorted(_SUPPORTED_REF_AUDIO_EXTENSIONS)}"
+                    ),
                 )
-            # Read with size guard (20 MB cap)
             ref_chunks: list[bytes] = []
             ref_total = 0
-            while chunk := await reference_audio.read(65_536):
+            while chunk := await reference_audio.read(_REF_AUDIO_CHUNK_BYTES):
                 ref_total += len(chunk)
                 if ref_total > _MAX_REF_AUDIO_BYTES:
                     raise HTTPException(
@@ -123,19 +135,19 @@ async def synthesise_speech(
                         detail="Reference audio exceeds 20 MB limit.",
                     )
                 ref_chunks.append(chunk)
-            ref_bytes = b"".join(ref_chunks)
 
             with tempfile.NamedTemporaryFile(suffix=ref_suffix, delete=False) as tmp:
-                ref_audio_path = tmp.name
-            async with aiofiles.open(ref_audio_path, "wb") as f:
-                while chunk := await reference_audio.read(65_536):
-                    total_bytes += len(chunk)
-                    if total_bytes > _MAX_REF_AUDIO_SIZE_BYTES:
-                        raise HTTPException(
-                            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            detail="Reference audio file exceeds 20 MB limit.",
-                        )
-                    await f.write(chunk)
+                upload_path = tmp.name
+                tmp.write(b"".join(ref_chunks))
+
+            try:
+                normalized_path, _ = normalize_reference_audio(upload_path)
+                ref_audio_path = str(normalized_path)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=str(exc),
+                ) from exc
 
         # ── Run Hybrid TTS ────────────────────────────────────────────────
         tts = await manager.get_tts()
@@ -165,7 +177,9 @@ async def synthesise_speech(
         audio_array = tts_result.audio
         sample_rate = tts_result.sample_rate
         engine_used = tts_result.engine
-        voice_note = tts_result.voice_note if hasattr(tts_result, "voice_note") else None
+        voice_note = getattr(tts_result, "voice_note", None)
+        voice_cloned = bool(getattr(tts_result, "voice_cloned", False))
+        reference_used = bool(getattr(tts_result, "reference_used", False))
 
         # ── Encode as base64 WAV ───────────────────────────────────────────
         audio_b64 = _audio_to_wav_base64(audio_array, sample_rate)
@@ -176,6 +190,8 @@ async def synthesise_speech(
             format="wav",
             engine=engine_used,
             voice_note=voice_note,
+            voice_cloned=voice_cloned,
+            reference_used=reference_used,
             elapsed_ms=round(elapsed_ms, 2),
         )
 
@@ -191,8 +207,10 @@ async def synthesise_speech(
             status_code=500, detail=f"TTS synthesis failed: {exc}"
         ) from exc
     finally:
-        if ref_audio_path:
+        for temp_path in {upload_path, ref_audio_path}:
+            if not temp_path:
+                continue
             try:
-                Path(ref_audio_path).unlink(missing_ok=True)
+                Path(temp_path).unlink(missing_ok=True)
             except OSError:
                 pass

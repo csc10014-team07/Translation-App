@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { API_BASE_URL, WS_BASE_URL } from '../config/api';
+import { DEFAULT_SOURCE_CODE } from '../constants/languages';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -53,6 +54,11 @@ export interface TTSResponse {
   audio_base64: string;
   sample_rate: number;
   format: string;
+  engine?: string;
+  voice_note?: string | null;
+  voice_cloned?: boolean;
+  reference_used?: boolean;
+  elapsed_ms?: number;
 }
 
 export interface HealthResponse {
@@ -109,44 +115,22 @@ function appendFileToForm(
   } as unknown as Blob);
 }
 
-function getAudioFileInfo(
-  uri: string,
-  fallbackName: string,
-): { fileName: string; mimeType: string } {
-  const rawName = uri.split('/').pop()?.split('?')[0] ?? fallbackName;
-  const dotIndex = rawName.lastIndexOf('.');
-  const ext = dotIndex !== -1 ? rawName.slice(dotIndex + 1).toLowerCase() : 'm4a';
-  const fileName = dotIndex !== -1 ? rawName : `${rawName}.${ext}`;
-
-  let mimeType = 'application/octet-stream';
-  if (ext === 'm4a' || ext === 'mp4') {
-    mimeType = 'audio/mp4';
-  } else if (ext === 'wav') {
-    mimeType = 'audio/wav';
-  } else if (ext === 'mp3') {
-    mimeType = 'audio/mpeg';
-  } else if (ext === 'flac') {
-    mimeType = 'audio/flac';
-  } else if (ext === 'ogg') {
-    mimeType = 'audio/ogg';
-  } else if (ext === 'webm') {
-    mimeType = 'audio/webm';
-  }
-
-  return { fileName, mimeType };
-}
-
 // ──────────────────────────────────────────────
 // API functions
 // ──────────────────────────────────────────────
 
 /**
- * POST /api/asr — send an audio file and get back Vietnamese text.
+ * POST /api/asr — send an audio file and get back recognized text.
+ * `sourceLanguage` (mã ISO) cho biết nguồn hiện tại; backend có thể bỏ qua.
  */
-export async function transcribeAudio(audioUri: string): Promise<ASRResponse> {
+export async function transcribeAudio(
+  audioUri: string,
+  sourceLanguage?: string,
+): Promise<ASRResponse> {
   const form = new FormData();
   const { fileName, mimeType } = getAudioFileInfo(audioUri, 'recording.m4a');
   appendFileToForm(form, 'audio', audioUri, mimeType, fileName);
+  if (sourceLanguage) form.append('source_language', sourceLanguage);
 
   const response = await apiClient.post<ASRResponse>('/api/asr', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -185,7 +169,7 @@ export async function ocrImage(
 export async function translateText(
   text: string,
   targetLanguage: string,
-  sourceLanguage = 'vi',
+  sourceLanguage: string = DEFAULT_SOURCE_CODE,
   context?: string,
   contextPreset?: string,
   customContext?: string,

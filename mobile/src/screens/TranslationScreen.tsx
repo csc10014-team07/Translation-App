@@ -1,3 +1,4 @@
+// Deprecated: thay bởi giao diện V2 (HomeScreen/TargetLanguageScreen/...). Giữ để tham khảo.
 import React, { useCallback, useEffect } from 'react';
 import {
   View,
@@ -289,7 +290,7 @@ export default function TranslationScreen() {
       {/* ── Voice Cloning Panel ── */}
       <VoiceCloningPanel
         translatedText={translatedText}
-        translatedLanguage={translatedLanguage}
+        targetLanguage={translatedLanguage || targetLanguage}
         isSynthesizing={isSynthesizing}
         synthesizedAudioUri={synthesizedAudioUri}
         onRecordReference={setReferenceAudio}

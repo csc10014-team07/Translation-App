@@ -40,6 +40,14 @@ class TTSResponse(BaseModel):
         default=None,
         description="Additional note about the voice used (e.g., cloning status, default voice).",
     )
+    voice_cloned: bool = Field(
+        default=False,
+        description="True only when the output used the supplied reference voice.",
+    )
+    reference_used: bool = Field(
+        default=False,
+        description="True when reference audio was accepted and sent to the synthesis engine.",
+    )
     elapsed_ms: float | None = Field(
         default=None,
         description="Elapsed synthesis time in milliseconds.",

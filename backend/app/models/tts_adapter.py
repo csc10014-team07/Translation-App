@@ -1,9 +1,11 @@
 """TTS Adapter providing Hybrid Voice-Cloning and Natural Neural Speech."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import tempfile
 import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -57,19 +59,35 @@ EDGE_VOICES_MALE = {
 
 EDGE_VOICES = EDGE_VOICES_FEMALE
 
+_VOICE_STATE_CACHE_MAX = 4
+_REFERENCE_HASH_CHUNK_BYTES = 1024 * 1024
+
+
 class TTSResult(tuple):
-    """Tuple of (audio_array: np.ndarray, sample_rate: int) with metadata attributes."""
+    """Tuple of (audio_array, sample_rate) with synthesis metadata."""
     audio: np.ndarray
     sample_rate: int
     engine: str
     voice_note: str
+    voice_cloned: bool
+    reference_used: bool
 
-    def __new__(cls, audio: np.ndarray, sample_rate: int, engine: str = "edge_tts", voice_note: str = "") -> TTSResult:
+    def __new__(
+        cls,
+        audio: np.ndarray,
+        sample_rate: int,
+        engine: str = "edge_tts",
+        voice_note: str = "",
+        voice_cloned: bool = False,
+        reference_used: bool = False,
+    ) -> TTSResult:
         obj = super().__new__(cls, (audio, sample_rate))
         obj.audio = audio
         obj.sample_rate = sample_rate
         obj.engine = engine
         obj.voice_note = voice_note
+        obj.voice_cloned = voice_cloned
+        obj.reference_used = reference_used
         return obj
 
 
@@ -80,6 +98,7 @@ class TTSAdapter:
         self._pocket_models: dict[str, Any] = {}
         self._pocket_load_locks: dict[str, threading.Lock] = {}
         self._pocket_inference_lock = threading.Lock()
+        self._voice_state_cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         # Pre-create locks for all Pocket TTS canonical languages
         for lang in set(POCKET_TTS_LANG_MAP.values()):
             self._pocket_load_locks[lang] = threading.Lock()
@@ -107,31 +126,72 @@ class TTSAdapter:
                         self._pocket_models[canonical_lang] = None
         return self._pocket_models.get(canonical_lang)
 
-    def _get_pocket_voice_state(self, model: Any, reference_audio_path: str | Path | None) -> tuple[dict[str, Any], str]:
-        """Get the voice state for Pocket TTS, either from reference audio or default."""
-        if reference_audio_path is not None:
-            ref_path = Path(reference_audio_path)
-            if ref_path.exists():
-                try:
-                    state = model.get_state_for_audio_prompt(str(reference_audio_path))
-                    logger.info("Pocket TTS voice cloning active from user reference audio.")
-                    return state, "voice cloned from reference audio"
-                except Exception as e:  # noqa: BLE001
-                    logger.warning("Pocket TTS cloning failed (%s), using default voice.", e)
-                    # Fall back to default voice
-                    voice_name = "alba"
-                    return model.get_state_for_audio_prompt(voice_name), f"cloning failed ({e}), using default voice '{voice_name}'"
-        # No reference audio, use default voice
-        voice_name = "alba"
-        return model.get_state_for_audio_prompt(voice_name), f"using default voice '{voice_name}'"
+    @staticmethod
+    def _reference_digest(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(_REFERENCE_HASH_CHUNK_BYTES), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _cache_voice_state(self, key: str, state: dict[str, Any]) -> None:
+        self._voice_state_cache[key] = state
+        self._voice_state_cache.move_to_end(key)
+        while len(self._voice_state_cache) > _VOICE_STATE_CACHE_MAX:
+            self._voice_state_cache.popitem(last=False)
+
+    def _cached_voice_state(self, key: str) -> dict[str, Any] | None:
+        state = self._voice_state_cache.get(key)
+        if state is not None:
+            self._voice_state_cache.move_to_end(key)
+        return state
 
     def _get_default_pocket_voice_for_language(self, language: str) -> str:
         """Get the default voice name for a Pocket TTS language."""
         try:
-            from pocket_tts import default_parameters
-            return default_parameters.get_default_voice_for_language(language)
+            from pocket_tts.default_parameters import get_default_voice_for_language
+
+            return get_default_voice_for_language(language)
         except Exception:  # noqa: BLE001
             return "alba"
+
+    def _get_pocket_voice_state(
+        self,
+        model: Any,
+        reference_audio_path: str | Path | None,
+        language: str,
+    ) -> tuple[dict[str, Any], str, bool]:
+        """Return (voice_state, note, cloned) preferring reference audio."""
+        clone_error: Exception | None = None
+        if reference_audio_path is not None:
+            ref_path = Path(reference_audio_path)
+            if ref_path.exists():
+                key = f"clone:{language}:{self._reference_digest(ref_path)}"
+                cached = self._cached_voice_state(key)
+                if cached is not None:
+                    return cached, "voice cloned from reference audio", True
+                try:
+                    state = model.get_state_for_audio_prompt(str(ref_path), truncate=True)
+                    self._cache_voice_state(key, state)
+                    logger.info("Pocket TTS voice cloning active from user reference audio.")
+                    return state, "voice cloned from reference audio", True
+                except Exception as e:  # noqa: BLE001
+                    clone_error = e
+                    logger.warning("Pocket TTS cloning failed (%s), using default voice.", e)
+
+        voice_name = self._get_default_pocket_voice_for_language(language)
+        key = f"default:{language}:{voice_name}"
+        state = self._cached_voice_state(key)
+        if state is None:
+            state = model.get_state_for_audio_prompt(voice_name)
+            self._cache_voice_state(key, state)
+        if clone_error is not None:
+            return (
+                state,
+                f"cloning failed ({clone_error}), using default voice '{voice_name}'",
+                False,
+            )
+        return state, f"using default voice '{voice_name}'", False
 
     def _resolve_edge_voice(self, language: str, voice_style: str | None = None) -> tuple[str, str]:
         """Resolve the appropriate Edge-TTS voice based on language and voice_style.
@@ -200,7 +260,13 @@ class TTSAdapter:
             audio_arr = data.astype(np.float32)
         finally:
             Path(tmp_path).unlink(missing_ok=True)
-        return TTSResult(audio_arr, sr, engine="edge_tts", voice_note=voice_note)
+        return TTSResult(
+            audio_arr,
+            sr,
+            engine="edge_tts",
+            voice_note=voice_note,
+            reference_used=False,
+        )
 
     async def synthesize(
         self,
@@ -277,28 +343,39 @@ class TTSAdapter:
         if model is None:
             raise RuntimeError(f"Pocket TTS model failed to load for {language}")
         
-        voice_note = ""
         try:
             with self._pocket_inference_lock:
-                # Get voice state
-                state, state_note = self._get_pocket_voice_state(model, reference_audio_path)
-                voice_note = state_note
-                
-                # Handle voice_style override
+                state, voice_note, cloned = self._get_pocket_voice_state(
+                    model, reference_audio_path, language
+                )
+
                 if voice_style and voice_style.lower() != "pocket_tts":
-                    # Try to use the specified voice as audio conditioning
                     try:
                         state = model.get_state_for_audio_prompt(voice_style)
                         voice_note = f"voice style: {voice_style}"
+                        cloned = False
                     except Exception as e:  # noqa: BLE001
-                        logger.warning("Voice style '%s' not recognized, using default: %s", voice_style, e)
-                        voice_note = f"voice style '{voice_style}' not recognized, using default"
-                
-                # Generate audio with the voice state
+                        logger.warning(
+                            "Voice style '%s' not recognized, using current voice: %s",
+                            voice_style,
+                            e,
+                        )
+                        voice_note = (
+                            f"voice style '{voice_style}' not recognized, "
+                            "using current voice"
+                        )
+
                 audio_tensor = model.generate_audio(state, text, max_tokens=250)
                 audio_np = audio_tensor.squeeze().cpu().numpy().astype(np.float32)
-                
-                return TTSResult(audio_np, model.sample_rate, engine="pocket_tts", voice_note=voice_note)
+
+                return TTSResult(
+                    audio_np,
+                    model.sample_rate,
+                    engine="pocket_tts",
+                    voice_note=voice_note,
+                    voice_cloned=cloned,
+                    reference_used=reference_audio_path is not None,
+                )
         except Exception as e:  # noqa: BLE001
             logger.warning("Pocket TTS synthesis failed for %s: %s", language, e)
             raise RuntimeError(f"Pocket TTS synthesis failed: {e}") from e

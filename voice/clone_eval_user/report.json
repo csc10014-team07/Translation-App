@@ -1,0 +1,503 @@
+{
+  "reference": "/tmp/opencode/reference_voice_clean.wav",
+  "reference_duration_s": 2.86,
+  "reference_sample_rate": 24000,
+  "model_load_warmup_ms": 4811.695910000708,
+  "texts": [
+    "The quick brown fox jumps over the lazy dog.",
+    "Please confirm the meeting time tomorrow morning.",
+    "The weather is beautiful today.",
+    "I would like to book a table for two.",
+    "Thank you for your help and support.",
+    "The train leaves the station at half past eight.",
+    "Could you please repeat the last sentence?",
+    "Our team will review the proposal this afternoon.",
+    "She bought a new laptop for her online classes.",
+    "The museum is closed on public holidays."
+  ],
+  "reps": 3,
+  "speaker_model": "microsoft/wavlm-base-plus-sv",
+  "asr_model": "openai/whisper-small.en",
+  "baseline": {
+    "condition": "default_alba",
+    "reference_audio": null,
+    "voice_note": "using default voice 'alba'",
+    "engine": "pocket_tts",
+    "sample_rate": 24000,
+    "cold_ms": 1119.5576140016783,
+    "n_attempted": 30,
+    "n_success": 30,
+    "failures": [],
+    "latency_ms": {
+      "mean": 1080.6964793998002,
+      "std": 183.75913348825006,
+      "min": 729.4696979988657,
+      "max": 1441.152144001535,
+      "p50": 1090.8587470003113,
+      "p95": 1343.3957769993867
+    },
+    "audio_duration_s": {
+      "mean": 2.336,
+      "std": 0.4076076544914239,
+      "min": 1.6,
+      "max": 3.04,
+      "p50": 2.4,
+      "p95": 2.88
+    },
+    "rtf": {
+      "mean": 0.46385023753082966,
+      "std": 0.02636819682780116,
+      "min": 0.4269064703123604,
+      "max": 0.5329664834822064,
+      "p50": 0.45849882444829315,
+      "p95": 0.5239219277170734
+    },
+    "wer": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "cer": {
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "speaker_similarity": {
+      "mean": 0.6606863637765249,
+      "std": 0.038584168528487,
+      "min": 0.5822199583053589,
+      "max": 0.7746657729148865,
+      "p50": 0.6583645641803741,
+      "p95": 0.7127555012702942
+    },
+    "transcriptions": [
+      {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "asr": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Please confirm the meeting time tomorrow morning.",
+        "asr": "Please confirm the meeting time tomorrow morning.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The weather is beautiful today.",
+        "asr": "The weather is beautiful today.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "I would like to book a table for two.",
+        "asr": "I would like to book a table for two.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Thank you for your help and support.",
+        "asr": "Thank you for your help and support.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The train leaves the station at half past eight.",
+        "asr": "The train leaves the station at half past eight.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Could you please repeat the last sentence?",
+        "asr": "Could you please repeat the last sentence?",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Our team will review the proposal this afternoon.",
+        "asr": "Our team will review the proposal this afternoon.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "She bought a new laptop for her online classes.",
+        "asr": "She bought a new laptop for her online classes.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The museum is closed on public holidays.",
+        "asr": "The museum is closed on public holidays.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "asr": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Please confirm the meeting time tomorrow morning.",
+        "asr": "Please confirm the meeting time tomorrow morning.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The weather is beautiful today.",
+        "asr": "The weather is beautiful today.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "I would like to book a table for two.",
+        "asr": "I would like to book a table for two.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Thank you for your help and support.",
+        "asr": "Thank you for your help and support.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The train leaves the station at half past eight.",
+        "asr": "The train leaves the station at half-past eight.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Could you please repeat the last sentence?",
+        "asr": "Could you please repeat the last sentence?",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Our team will review the proposal this afternoon.",
+        "asr": "Our team will review the proposal this afternoon.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "She bought a new laptop for her online classes.",
+        "asr": "She bought a new laptop for her online classes.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The museum is closed on public holidays.",
+        "asr": "The museum is closed on public holidays.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "asr": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Please confirm the meeting time tomorrow morning.",
+        "asr": "Please confirm the meeting time tomorrow morning.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The weather is beautiful today.",
+        "asr": "The weather is beautiful today.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "I would like to book a table for two.",
+        "asr": "I would like to book a table for two.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Thank you for your help and support.",
+        "asr": "Thank you for your help and support.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The train leaves the station at half past eight.",
+        "asr": "The train leaves the station at half-past eight.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Could you please repeat the last sentence?",
+        "asr": "Could you please repeat the last sentence?",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Our team will review the proposal this afternoon.",
+        "asr": "Our team will review the proposal this afternoon.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "She bought a new laptop for her online classes.",
+        "asr": "She bought a new laptop for her online classes.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The museum is closed on public holidays.",
+        "asr": "The museum is closed on public holidays.",
+        "wer": 0.0,
+        "cer": 0.0
+      }
+    ]
+  },
+  "cloned": {
+    "condition": "cloned",
+    "reference_audio": "/tmp/opencode/reference_voice_clean.wav",
+    "voice_note": "voice cloned from reference audio",
+    "engine": "pocket_tts",
+    "sample_rate": 24000,
+    "cold_ms": 1622.3550889990292,
+    "n_attempted": 30,
+    "n_success": 30,
+    "failures": [],
+    "latency_ms": {
+      "mean": 1546.0971334661735,
+      "std": 169.2998105110265,
+      "min": 1258.6559939991275,
+      "max": 1828.1907310010865,
+      "p50": 1573.5976215000846,
+      "p95": 1827.9496440009098
+    },
+    "audio_duration_s": {
+      "mean": 2.3226666666666667,
+      "std": 0.3496182044586479,
+      "min": 1.76,
+      "max": 2.8,
+      "p50": 2.44,
+      "p95": 2.72
+    },
+    "rtf": {
+      "mean": 0.6716817554223461,
+      "std": 0.05459396838476609,
+      "min": 0.587956579412254,
+      "max": 0.7817338509994443,
+      "p50": 0.6510030256110925,
+      "p95": 0.7783931216338784
+    },
+    "wer": {
+      "mean": 0.0037037037037037034,
+      "std": 0.0199450548412389,
+      "min": 0.0,
+      "max": 0.1111111111111111,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "cer": {
+      "mean": 0.002857142857142857,
+      "std": 0.01538618516324144,
+      "min": 0.0,
+      "max": 0.08571428571428572,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "speaker_similarity": {
+      "mean": 0.7767415722211202,
+      "std": 0.0788077248963809,
+      "min": 0.6007936596870422,
+      "max": 0.9122223258018494,
+      "p50": 0.7735829949378967,
+      "p95": 0.8895113468170166
+    },
+    "transcriptions": [
+      {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "asr": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Please confirm the meeting time tomorrow morning.",
+        "asr": "Please confirm the meeting time tomorrow morning.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The weather is beautiful today.",
+        "asr": "The weather is beautiful today.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "I would like to book a table for two.",
+        "asr": "I would like to book a table for two.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Thank you for your help and support.",
+        "asr": "Thank you for your help and support.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The train leaves the station at half past eight.",
+        "asr": "The train leaves the station at half past eight.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Could you please repeat the last sentence?",
+        "asr": "Could you please repeat the last sentence?",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Our team will review the proposal this afternoon.",
+        "asr": "Our team will review the proposal this afternoon.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "She bought a new laptop for her online classes.",
+        "asr": "She bought a new laptop for her online classes.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The museum is closed on public holidays.",
+        "asr": "The museum is closed on public holidays.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "asr": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Please confirm the meeting time tomorrow morning.",
+        "asr": "Please confirm the meeting time tomorrow morning.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The weather is beautiful today.",
+        "asr": "The weather is beautiful today.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "I would like to book a table for two.",
+        "asr": "I would like to book a table for two.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Thank you for your help and support.",
+        "asr": "Thank you for your help and support.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The train leaves the station at half past eight.",
+        "asr": "The train leaves the station at half past eight.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Could you please repeat the last sentence?",
+        "asr": "Could you please repeat the last sentence?",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Our team will review the proposal this afternoon.",
+        "asr": "Our team will review the proposal this afternoon.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "She bought a new laptop for her online classes.",
+        "asr": "She bought a new laptop for her online classes.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The museum is closed on public holidays.",
+        "asr": "The museum is closed on public holidays.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "asr": "A quick brown fox jumps over the lazy dog.",
+        "wer": 0.1111111111111111,
+        "cer": 0.08571428571428572
+      },
+      {
+        "text": "Please confirm the meeting time tomorrow morning.",
+        "asr": "Please confirm the meeting time tomorrow morning.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The weather is beautiful today.",
+        "asr": "The weather is beautiful today.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "I would like to book a table for two.",
+        "asr": "I would like to book a table for two.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Thank you for your help and support.",
+        "asr": "Thank you for your help and support.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The train leaves the station at half past eight.",
+        "asr": "The train leaves the station at half past eight.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Could you please repeat the last sentence?",
+        "asr": "Could you please repeat the last sentence?",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "Our team will review the proposal this afternoon.",
+        "asr": "Our team will review the proposal this afternoon.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "She bought a new laptop for her online classes.",
+        "asr": "She bought a new laptop for her online classes.",
+        "wer": 0.0,
+        "cer": 0.0
+      },
+      {
+        "text": "The museum is closed on public holidays.",
+        "asr": "The museum is closed on public holidays.",
+        "wer": 0.0,
+        "cer": 0.0
+      }
+    ]
+  }
+}
